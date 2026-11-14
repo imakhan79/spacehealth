@@ -18,6 +18,8 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // ~/package-lock.json exists outside this repo; pin the workspace root.
+  turbopack: { root: import.meta.dirname },
   output: "standalone",
   poweredByHeader: false,
   // No sharp / remote image optimisation on flight hardware.

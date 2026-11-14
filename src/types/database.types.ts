@@ -261,6 +261,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_link_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          status: Database["public"]["Enums"]["uplink_link_status"]
+          last_contact_at: string | null
+          last_probe_at: string | null
+          last_batch_at: string | null
+          rtt_ms: number | null
+          consecutive_failures: number
+        }[]
+      }
       get_uplink_backlog: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -290,6 +301,7 @@ export type Database = {
       alert_severity: "advisory" | "caution" | "warning" | "emergency"
       alert_status: "active" | "acknowledged" | "overridden" | "resolved"
       uplink_operation: "upsert" | "tombstone"
+      uplink_link_status: "local_mode" | "uplink_active" | "degraded"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -328,6 +340,7 @@ export const Constants = {
       alert_severity: ["advisory", "caution", "warning", "emergency"],
       alert_status: ["active", "acknowledged", "overridden", "resolved"],
       uplink_operation: ["upsert", "tombstone"],
+      uplink_link_status: ["local_mode", "uplink_active", "degraded"],
     },
   },
 } as const satisfies {
