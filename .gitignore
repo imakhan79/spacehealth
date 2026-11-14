@@ -15,3 +15,5 @@ crew-credentials*
 # Flight bundles
 *.tar
 *.tar.sha256
+
+.vercel
