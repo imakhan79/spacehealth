@@ -1,6 +1,7 @@
 import "server-only";
+import { createPgStore } from "./pg-store.ts";
 import { createEarthClient, createSupabaseStore } from "./supabase-store.ts";
-import type { HandlerDeps } from "./handlers.ts";
+import type { EarthStore, HandlerDeps } from "./handlers.ts";
 
 // UPLINK_SECRETS = {"omni-1": "<hex secret shared with that spacecraft>", ...}
 function loadUplinkSecrets(): Map<string, string> {
@@ -21,7 +22,13 @@ function loadUplinkSecrets(): Map<string, string> {
   }
 }
 
-export function earthDatabaseConfig(): { url: string; key: string } | null {
+/** Preferred: direct Postgres as the least-privilege omni_ingest login. */
+export function earthDatabaseUrl(): string | null {
+  const url = process.env.DATABASE_URL;
+  return url !== undefined && url.length > 0 ? url : null;
+}
+
+function earthSupabaseConfig(): { url: string; key: string } | null {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   // Server-only key. The publishable/anon key cannot (and must not) ingest.
   const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -29,14 +36,21 @@ export function earthDatabaseConfig(): { url: string; key: string } | null {
   return { url, key };
 }
 
+function createStore(): EarthStore | null {
+  const databaseUrl = earthDatabaseUrl();
+  if (databaseUrl !== null) return createPgStore(databaseUrl);
+  const supabase = earthSupabaseConfig();
+  if (supabase !== null) return createSupabaseStore(createEarthClient(supabase.url, supabase.key));
+  return null;
+}
+
 let cached: HandlerDeps | null = null;
 
 export function handlerDeps(): HandlerDeps {
   if (cached !== null) return cached;
   const secrets = loadUplinkSecrets();
-  const db = earthDatabaseConfig();
   cached = {
-    store: db === null ? null : createSupabaseStore(createEarthClient(db.url, db.key)),
+    store: createStore(),
     secretFor: (id) => secrets.get(id),
     nowMs: () => Date.now(),
     log: (event, fields) => console.log(JSON.stringify({ event, ...fields })),

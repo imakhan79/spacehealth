@@ -183,3 +183,30 @@ $$;
 
 revoke all on function public.ingest_uplink_batch(text, jsonb, integer) from public, anon, authenticated;
 grant execute on function public.ingest_uplink_batch(text, jsonb, integer) to service_role;
+
+-- -----------------------------------------------------------------------------
+-- Least-privilege login for Mission Control. Its password is set out of band
+-- (never in this repo) and lives only in Vercel's DATABASE_URL. It can run the
+-- ingest and read uplink state; it cannot write tables directly.
+-- -----------------------------------------------------------------------------
+do $$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'omni_ingest') then
+    create role omni_ingest nologin noinherit;
+  end if;
+end
+$$;
+
+-- Runs with the owner's rights so omni_ingest needs no table write grants.
+alter function public.ingest_uplink_batch(text, jsonb, integer) security definer;
+
+grant usage on schema public to omni_ingest;
+grant execute on function public.ingest_uplink_batch(text, jsonb, integer) to omni_ingest;
+grant select on public.uplink_batches, public.spacecraft_records, public.spacecraft_record_conflicts to omni_ingest;
+
+create policy uplink_batches_ingest_read on public.uplink_batches
+  for select to omni_ingest using (true);
+create policy spacecraft_records_ingest_read on public.spacecraft_records
+  for select to omni_ingest using (true);
+create policy spacecraft_record_conflicts_ingest_read on public.spacecraft_record_conflicts
+  for select to omni_ingest using (true);
