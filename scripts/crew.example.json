@@ -1,0 +1,6 @@
+[
+  { "callsign": "SENSORS", "full_name": "Biomedical Sensor Gateway", "role": "sensor_gateway", "email": "sensors@crew.omni.local" },
+  { "callsign": "CDR", "full_name": "Mission Commander", "role": "commander", "email": "cdr@crew.omni.local" },
+  { "callsign": "SURGEON", "full_name": "Crew Medical Officer", "role": "flight_surgeon", "email": "cmo@crew.omni.local" },
+  { "callsign": "MS1", "full_name": "Mission Specialist 1", "role": "crew", "email": "ms1@crew.omni.local" }
+]

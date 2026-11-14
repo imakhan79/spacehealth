@@ -1,0 +1,5 @@
+# Containers run these files on Linux: CRLF breaks #!/bin/sh and changes
+# migration checksums. Force LF everywhere.
+* text=auto eol=lf
+*.png binary
+*.ico binary

@@ -1,0 +1,21 @@
+# Flight overlay: never contact a registry. Images must already be loaded
+# from the flight bundle (scripts/flight-bundle.sh load). A missing image
+# fails loudly at `up` instead of silently trying to reach Docker Hub.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.flight.yml up -d
+
+services:
+  db:
+    pull_policy: never
+  auth:
+    pull_policy: never
+  rest:
+    pull_policy: never
+  realtime:
+    pull_policy: never
+  migrate:
+    pull_policy: never
+  web:
+    pull_policy: never
+  gateway:
+    pull_policy: never

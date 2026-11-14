@@ -1,0 +1,16 @@
+.git
+node_modules
+.next
+data
+docker
+supabase
+scripts
+*.tar
+*.tar.sha256
+.env
+.env.*
+crew-credentials*
+npm-debug.log*
+Dockerfile
+docker-compose*.yml
+README.md

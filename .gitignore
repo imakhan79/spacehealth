@@ -1,0 +1,17 @@
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# Runtime state: database files, TLS keys, pgsodium root key
+data/
+
+# Secrets
+.env
+.env.*
+!.env.example
+crew-credentials*
+
+# Flight bundles
+*.tar
+*.tar.sha256

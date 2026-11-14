@@ -1,0 +1,307 @@
+# OMNI spacecraft edge stack.
+#
+#   First boot:  node scripts/generate-secrets.ts && sh scripts/generate-certs.sh
+#                docker compose up -d
+#   Flight:      docker compose -f docker-compose.yml -f docker-compose.flight.yml up -d
+#
+# Derived from supabase/supabase docker/docker-compose.yml (master, 2026-11-15),
+# trimmed to what OMNI needs on low-resource flight hardware:
+#   kept     db, auth (GoTrue), rest (PostgREST), realtime
+#   replaced Envoy/Kong -> nginx gateway (also serves the Next.js app, same origin)
+#   dropped  studio, meta, storage, imgproxy, edge-runtime, supavisor, analytics
+#
+# Every service except the gateway lives on the `backend` network, which is
+# `internal: true`: Docker gives it no route off the host, so nothing in the
+# stack can phone Earth even by accident. Phase 3's relay will be the only
+# service granted the DSN-facing network.
+
+name: omni
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+
+networks:
+  backend:
+    internal: true
+  lan: {}
+
+services:
+  db:
+    image: supabase/postgres:17.6.1.136
+    restart: always
+    <<: *hardening
+    logging: *logging
+    mem_limit: ${OMNI_DB_MEM_LIMIT:-768m}
+    cpus: ${OMNI_DB_CPUS:-1.0}
+    shm_size: 128mb
+    # Give Postgres time to checkpoint cleanly on shutdown; a torn WAL on a
+    # spacecraft cannot be fixed by restoring from a cloud backup.
+    stop_grace_period: 60s
+    networks: [backend]
+    volumes:
+      - ./docker/db/init/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:ro,Z
+      - ./docker/db/init/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:ro,Z
+      - ./docker/db/init/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:ro,Z
+      - ${OMNI_DATA_DIR:-./data}/db:/var/lib/postgresql/data:Z
+      # pgsodium root key; losing it makes encrypted columns unreadable.
+      - ${OMNI_DATA_DIR:-./data}/db-config:/etc/postgresql-custom:Z
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      PGPORT: 5432
+      POSTGRES_PORT: 5432
+      PGPASSWORD: ${POSTGRES_PASSWORD:?run scripts/generate-secrets.ts}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: postgres
+      POSTGRES_DB: postgres
+      JWT_EXP: ${JWT_EXPIRY:-3600}
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - log_min_messages=error
+      # Sized for a ~768 MB container. Durability settings are pinned ON
+      # explicitly so no one "optimises" them away later.
+      - -c
+      - max_connections=80
+      - -c
+      - shared_buffers=${OMNI_PG_SHARED_BUFFERS:-160MB}
+      - -c
+      - effective_cache_size=${OMNI_PG_EFFECTIVE_CACHE:-448MB}
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=48MB
+      - -c
+      - fsync=on
+      - -c
+      - full_page_writes=on
+      - -c
+      - synchronous_commit=on
+      - -c
+      - wal_compression=on
+      - -c
+      - max_wal_size=512MB
+      - -c
+      - min_wal_size=64MB
+
+  auth:
+    image: supabase/gotrue:v2.197.0
+    restart: always
+    <<: *hardening
+    logging: *logging
+    mem_limit: ${OMNI_AUTH_MEM_LIMIT:-128m}
+    cpus: 0.5
+    networks: [backend]
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${OMNI_SITE_URL:-https://omni.local:8443}/auth/v1
+
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+
+      GOTRUE_SITE_URL: ${OMNI_SITE_URL:-https://omni.local:8443}
+      GOTRUE_URI_ALLOW_LIST: ${OMNI_SITE_URL:-https://omni.local:8443}/**
+
+      # --- Local-only identity -------------------------------------------
+      # Crew accounts are provisioned by the commander/ground before flight
+      # (scripts/provision-crew.ts). No self sign-up, no OAuth, no SMS, no
+      # anonymous users, no email delivery.
+      GOTRUE_DISABLE_SIGNUP: "true"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"      # enables the email+password grant only
+      GOTRUE_MAILER_AUTOCONFIRM: "true"          # no SMTP in deep space
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+      GOTRUE_SMS_AUTOCONFIRM: "false"
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
+      # Both of these would make outbound internet calls; pinned off.
+      GOTRUE_MAILER_EMAIL_VALIDATION_EXTENDED: "false"
+      GOTRUE_PASSWORD_HIBP_ENABLED: "false"
+      GOTRUE_PASSWORD_MIN_LENGTH: "12"
+      # Rate-limit (brute-force guard) per crew device, not per gateway IP.
+      GOTRUE_RATE_LIMIT_HEADER: X-Real-IP
+
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: ${JWT_EXPIRY:-3600}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET:?run scripts/generate-secrets.ts}
+      GOTRUE_JWT_ISSUER: ${OMNI_SITE_URL:-https://omni.local:8443}/auth/v1
+
+  rest:
+    image: postgrest/postgrest:v14.18
+    restart: always
+    <<: *hardening
+    logging: *logging
+    mem_limit: ${OMNI_REST_MEM_LIMIT:-128m}
+    cpus: 0.5
+    networks: [backend]
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "postgrest", "--ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_MAX_ROWS: 1000
+      PGRST_DB_EXTRA_SEARCH_PATH: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_DB_POOL: 8
+      PGRST_ADMIN_SERVER_PORT: 3001
+      PGRST_ADMIN_SERVER_HOST: localhost
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_EXP: ${JWT_EXPIRY:-3600}
+      # Don't publish the schema as OpenAPI to every crew tablet.
+      PGRST_OPENAPI_MODE: disabled
+    command: ["postgrest"]
+
+  realtime:
+    image: supabase/realtime:v2.148.3
+    restart: always
+    <<: *hardening
+    logging: *logging
+    mem_limit: ${OMNI_REALTIME_MEM_LIMIT:-384m}
+    cpus: 0.5
+    networks:
+      backend:
+        # Realtime derives the tenant id from the Host's first label.
+        aliases: [realtime-dev.supabase-realtime]
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'curl -sSfL --head -o /dev/null -H "Authorization: Bearer ${ANON_KEY}" http://localhost:4000/api/tenants/realtime-dev/health'
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    environment:
+      PORT: 4000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: postgres
+      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
+      DB_ENC_KEY: ${REALTIME_DB_ENC_KEY:?run scripts/generate-secrets.ts}
+      API_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:?run scripts/generate-secrets.ts}
+      METRICS_JWT_SECRET: ${JWT_SECRET}
+      ERL_AFLAGS: -proto_dist inet_tcp
+      DNS_NODES: "''"
+      RLIMIT_NOFILE: "10000"
+      APP_NAME: realtime
+      SEED_SELF_HOST: "true"
+      RUN_JANITOR: "true"
+      DISABLE_HEALTHCHECK_LOGGING: "true"
+
+  # One-shot: applies supabase/migrations/*.sql in order (checksummed), then
+  # sets the relay's login password. `web` waits for it to exit 0.
+  migrate:
+    image: supabase/postgres:17.6.1.136
+    restart: "no"
+    <<: *hardening
+    logging: *logging
+    mem_limit: 128m
+    networks: [backend]
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_healthy   # GoTrue creates auth.users, which our FKs reference
+    entrypoint: ["/bin/sh", "/omni/run-migrations.sh"]
+    volumes:
+      - ./supabase/migrations:/omni/migrations:ro,Z
+      - ./docker/migrate/run-migrations.sh:/omni/run-migrations.sh:ro,Z
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+      PGUSER: postgres
+      PGDATABASE: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      OMNI_RELAY_PASSWORD: ${OMNI_RELAY_PASSWORD:?run scripts/generate-secrets.ts}
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: omni/web:${OMNI_VERSION:-dev}
+    restart: always
+    <<: *hardening
+    logging: *logging
+    mem_limit: ${OMNI_WEB_MEM_LIMIT:-384m}
+    cpus: 1.0
+    read_only: true
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp:size=32m
+      - /app/.next/cache:uid=1001,gid=1001,mode=0700,size=64m
+    networks: [backend]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      # Server-side Supabase calls go through the gateway's internal listener.
+      # The browser uses its own origin (same-origin gateway), so no URL is
+      # baked into the client bundle at build time on Earth.
+      OMNI_SUPABASE_INTERNAL_URL: http://gateway:8000
+      OMNI_SUPABASE_ANON_KEY: ${ANON_KEY:?run scripts/generate-secrets.ts}
+
+  gateway:
+    image: nginx:1.30.5-alpine3.24
+    restart: always
+    <<: *hardening
+    logging: *logging
+    mem_limit: 64m
+    cpus: 0.5
+    networks: [backend, lan]
+    ports:
+      # Crew LAN: HTTPS (required for service workers / offline cache).
+      - ${OMNI_BIND_ADDR:-0.0.0.0}:${OMNI_HTTPS_PORT:-8443}:8443
+      - ${OMNI_BIND_ADDR:-0.0.0.0}:${OMNI_HTTP_PORT:-8080}:8080
+      # Admin API (accepts the service_role key): host loopback only.
+      - 127.0.0.1:${OMNI_ADMIN_PORT:-8000}:8000
+    volumes:
+      - ./docker/gateway/default.conf.template:/etc/nginx/templates/default.conf.template:ro,Z
+      - ./docker/gateway/api-routes.conf:/etc/nginx/omni/api-routes.conf:ro,Z
+      - ./docker/gateway/proxy-common.conf:/etc/nginx/omni/proxy-common.conf:ro,Z
+      - ${OMNI_TLS_DIR:-./data/tls}:/etc/omni/tls:ro,Z
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8000/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY:?run scripts/generate-secrets.ts}
+      OMNI_HTTPS_PORT: ${OMNI_HTTPS_PORT:-8443}
+      # The image's envsubst step only touches variables listed here, leaving
+      # nginx's own $variables alone. ($$ = literal $ for compose.)
+      NGINX_ENVSUBST_FILTER: "^(ANON_KEY|SERVICE_ROLE_KEY|OMNI_HTTPS_PORT)$$"
