@@ -50,6 +50,7 @@ function main(): void {
     SECRET_KEY_BASE: token(48),
     REALTIME_DB_ENC_KEY: token(8), // realtime requires exactly 16 characters
     OMNI_RELAY_PASSWORD: token(24),
+    OMNI_UPLINK_SECRET: token(32),
   };
 
   const lines = readFileSync(examplePath, "utf8").split(/\r?\n/);

@@ -31,6 +31,10 @@ networks:
   backend:
     internal: true
   lan: {}
+  # The only route off the spacecraft, used solely by `relay`. On flight
+  # hardware, back this with the comms interface (e.g. a macvlan on the
+  # DSN modem's NIC) so no other path to Earth exists.
+  dsn: {}
 
 services:
   db:
@@ -273,6 +277,33 @@ services:
       # baked into the client bundle at build time on Earth.
       OMNI_SUPABASE_INTERNAL_URL: http://gateway:8000
       OMNI_SUPABASE_ANON_KEY: ${ANON_KEY:?run scripts/generate-secrets.ts}
+
+  # Ships uplink_queue to Earth whenever the DSN link answers.
+  relay:
+    build:
+      context: .
+      dockerfile: relay/Dockerfile
+    image: omni/relay:${OMNI_VERSION:-dev}
+    restart: always
+    <<: *hardening
+    logging: *logging
+    mem_limit: 128m
+    cpus: 0.5
+    read_only: true
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp:uid=1001,gid=1001,mode=0700,size=8m
+    networks: [backend, dsn]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      OMNI_RELAY_DATABASE_URL: postgres://omni_relay:${OMNI_RELAY_PASSWORD}@db:5432/postgres
+      OMNI_SPACECRAFT_ID: ${OMNI_SPACECRAFT_ID:-omni-1}
+      OMNI_UPLINK_URL: ${OMNI_UPLINK_URL:?set to the Mission Control base URL}
+      OMNI_UPLINK_SECRET: ${OMNI_UPLINK_SECRET:?run scripts/generate-secrets.ts}
+      OMNI_UPLINK_MAX_BATCH_ENTRIES: ${OMNI_UPLINK_MAX_BATCH_ENTRIES:-500}
+      OMNI_UPLINK_MAX_BATCH_BYTES: ${OMNI_UPLINK_MAX_BATCH_BYTES:-1000000}
 
   gateway:
     image: nginx:1.30.5-alpine3.24

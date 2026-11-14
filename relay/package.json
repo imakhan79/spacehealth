@@ -1,0 +1,19 @@
+{
+  "name": "omni-relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Spacecraft-side uplink relay: batches uplink_queue to Earth when the DSN link is up",
+  "engines": {
+    "node": ">=24.11.0 <25"
+  },
+  "scripts": {
+    "start": "node src/main.ts"
+  },
+  "dependencies": {
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1"
+  }
+}

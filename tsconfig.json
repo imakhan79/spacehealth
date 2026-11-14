@@ -41,6 +41,8 @@
   ],
   "exclude": [
     "node_modules",
-    "data"
+    "data",
+    "relay",
+    "mission-control"
   ]
 }

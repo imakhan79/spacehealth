@@ -19,3 +19,5 @@ services:
     pull_policy: never
   gateway:
     pull_policy: never
+  relay:
+    pull_policy: never

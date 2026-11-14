@@ -1,0 +1,6 @@
+# BuildKit uses this instead of the root .dockerignore for relay/Dockerfile.
+*
+!packages/uplink-protocol/**
+!relay/package.json
+!relay/package-lock.json
+!relay/src/**
