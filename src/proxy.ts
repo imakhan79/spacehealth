@@ -58,5 +58,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|sw\\.js|manifest\\.webmanifest|icon\\.svg|api/health).*)"],
+  // auth/v1 and rest/v1 are Supabase's own APIs (gateway aboard, rewrites on a
+  // ground demo); they authenticate themselves and must never redirect.
+  matcher: ["/((?!_next/static|_next/image|sw\\.js|manifest\\.webmanifest|icon\\.svg|api/health|auth/v1/|rest/v1/).*)"],
 };

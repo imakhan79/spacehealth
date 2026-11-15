@@ -17,7 +17,20 @@ const contentSecurityPolicy = [
   "form-action 'self'",
 ].join("; ");
 
+// Aboard, the gateway serves Supabase's /auth and /rest on the app's own
+// origin. A ground demo (e.g. on Vercel) has no gateway, so when this is set
+// Next proxies those paths to a hosted Supabase instead. The browser still
+// only ever talks to its own origin. Leave unset on flight hardware.
+const supabaseProxyTarget = process.env.OMNI_SUPABASE_PROXY_TARGET?.replace(/\/+$/, "");
+
 const nextConfig: NextConfig = {
+  async rewrites() {
+    if (!supabaseProxyTarget) return [];
+    return [
+      { source: "/auth/v1/:path*", destination: `${supabaseProxyTarget}/auth/v1/:path*` },
+      { source: "/rest/v1/:path*", destination: `${supabaseProxyTarget}/rest/v1/:path*` },
+    ];
+  },
   // ~/package-lock.json exists outside this repo; pin the workspace root.
   turbopack: { root: import.meta.dirname },
   output: "standalone",
