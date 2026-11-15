@@ -105,6 +105,119 @@ function describePayload(table: string, payload: Record<string, unknown>): strin
   }
 }
 
+// --- Ground view of crew health, rebuilt from the replicated rows ------------
+
+export interface GroundCrew {
+  id: string;
+  callsign: string;
+  fullName: string;
+  role: string;
+}
+
+export interface GroundAlert {
+  id: string;
+  crewId: string;
+  severity: string;
+  status: string;
+  message: string;
+  triggeredAt: string;
+  overrideReason: string | null;
+  overriddenBy: string | null;
+  acknowledgedBy: string | null;
+  rowVersion: number;
+}
+
+export interface GroundVital {
+  crewId: string;
+  metric: string;
+  value: number;
+  unit: string;
+  recordedAt: string;
+}
+
+export interface GroundAcoustic {
+  moduleId: string;
+  laeq: number;
+  limitExceeded: boolean;
+  windowStart: string;
+}
+
+export interface CrewHealth {
+  crew: GroundCrew[];
+  alerts: GroundAlert[];
+  vitals: GroundVital[];
+  acoustics: GroundAcoustic[];
+  lastBatchAt: string | null;
+}
+
+function payloadOf(row: unknown): Record<string, unknown> {
+  return isRecord(row) && isRecord(row.payload) ? row.payload : {};
+}
+
+function nullableStr(value: unknown): string | null {
+  return value === null || value === undefined ? null : String(value);
+}
+
+export async function crewHealth(connectionString: string): Promise<CrewHealth> {
+  const db = getPool(connectionString);
+  const [crew, alerts, vitals, acoustics, last] = await Promise.all([
+    db.query(
+      `select payload from public.spacecraft_records
+        where source_table = 'crew_members' and payload->>'role' <> 'sensor_gateway' and payload->>'deleted_at' is null
+        order by payload->>'callsign'`,
+    ),
+    db.query(
+      `select payload, row_version from public.spacecraft_records
+        where source_table = 'health_alerts' and payload->>'deleted_at' is null
+        order by (payload->>'triggered_at')::timestamptz desc limit 60`,
+    ),
+    db.query(
+      `select payload from public.spacecraft_records
+        where source_table = 'crew_telemetry'
+        order by (payload->>'recorded_at')::timestamptz desc limit 1500`,
+    ),
+    db.query(
+      `select distinct on (payload->>'module_id') payload from public.spacecraft_records
+        where source_table = 'ambient_acoustics'
+        order by payload->>'module_id', (payload->>'window_start')::timestamptz desc`,
+    ),
+    db.query("select max(received_at) as at from public.uplink_batches"),
+  ]);
+
+  const lastAt: unknown = isRecord(last.rows[0]) ? last.rows[0].at : null;
+
+  return {
+    crew: crew.rows.map((r: unknown) => {
+      const p = payloadOf(r);
+      return { id: str(p.id), callsign: str(p.callsign), fullName: str(p.full_name), role: str(p.role) };
+    }),
+    alerts: alerts.rows.map((r: unknown) => {
+      const p = payloadOf(r);
+      return {
+        id: str(p.id),
+        crewId: str(p.crew_member_id),
+        severity: str(p.severity),
+        status: str(p.status),
+        message: str(p.message),
+        triggeredAt: str(p.triggered_at),
+        overrideReason: nullableStr(p.override_reason),
+        overriddenBy: nullableStr(p.overridden_by),
+        acknowledgedBy: nullableStr(p.acknowledged_by),
+        rowVersion: isRecord(r) ? Number(r.row_version) : 1,
+      };
+    }),
+    vitals: vitals.rows.map((r: unknown) => {
+      const p = payloadOf(r);
+      return { crewId: str(p.crew_member_id), metric: str(p.metric), value: Number(p.value), unit: str(p.unit), recordedAt: str(p.recorded_at) };
+    }),
+    acoustics: acoustics.rows.map((r: unknown) => {
+      const p = payloadOf(r);
+      return { moduleId: str(p.module_id), laeq: Number(p.laeq_dba), limitExceeded: p.limit_exceeded === true, windowStart: str(p.window_start) };
+    }),
+    lastBatchAt: lastAt instanceof Date ? lastAt.toISOString() : nullableStr(lastAt),
+  };
+}
+
 export async function overview(connectionString: string): Promise<Overview> {
   const db = getPool(connectionString);
   const [batches, records, totals, conflicts] = await Promise.all([

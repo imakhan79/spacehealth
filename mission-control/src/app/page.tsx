@@ -1,5 +1,6 @@
 import { configuredSpacecraft, earthDatabaseUrl } from "@/lib/config";
 import { overview, type Overview } from "@/lib/pg-store";
+import { Nav } from "./nav";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export default async function MissionControlHome() {
     <main style={{ padding: "2rem 1rem", maxWidth: 1100, margin: "0 auto" }}>
       <h1 style={{ marginBottom: 0 }}>OMNI Mission Control</h1>
       <p style={{ color: muted, marginTop: "0.25rem" }}>Deep Space Network uplink receiver · Earth</p>
+      <Nav active="status" />
 
       <ul style={{ lineHeight: 1.8, paddingLeft: "1.2rem" }}>
         <li>
