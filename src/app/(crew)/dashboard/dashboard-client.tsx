@@ -16,9 +16,12 @@ import { loadSnapshot } from "@/lib/dashboard/queries";
 import { EMPTY_SNAPSHOT, type HealthAlert, type Me, type Snapshot } from "@/lib/dashboard/types";
 import { deleteMutation, readOutbox, readSnapshot, saveMutation, writeSnapshot } from "@/lib/offline/store";
 import { clockTime } from "@/lib/utils";
+import { AlarmBanner } from "./alarm-banner";
 import { AlertsPanel } from "./alerts-panel";
 import { CabinAcoustics } from "./cabin-acoustics";
 import { CrewVitals } from "./crew-vitals";
+import { RadiationPanel } from "./radiation-panel";
+import { VitalTrends } from "./vital-trends";
 
 const POLL_MS = 5_000;
 const ME_KEY = "omni:me";
@@ -272,6 +275,8 @@ export function DashboardClient({
         </ul>
       )}
 
+      <AlarmBanner alerts={alerts} crewById={crewById} me={me} pendingIds={pendingIds} onAction={perform} />
+
       <AlertsPanel
         alerts={alerts}
         crewById={crewById}
@@ -285,8 +290,13 @@ export function DashboardClient({
         <div className="lg:col-span-2">
           <CrewVitals crew={snapshot.crew} vitals={snapshot.vitals} />
         </div>
-        <CabinAcoustics windows={snapshot.acoustics} />
+        <div className="flex flex-col gap-6">
+          <CabinAcoustics windows={snapshot.acoustics} />
+          <RadiationPanel crew={snapshot.crew} vitals={snapshot.vitals} />
+        </div>
       </div>
+
+      <VitalTrends crew={snapshot.crew} vitals={snapshot.vitals} me={me} />
     </div>
   );
 }

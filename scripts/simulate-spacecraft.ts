@@ -41,6 +41,23 @@ for (const [member, device] of [[crew.alice, "wrist-alpha"], [crew.bob, "wrist-b
     [], USERS.gateway);
 }
 
+// Dosimetry every 5 minutes: dose rate near deep-space background and a
+// running career total.
+for (const [member, device, startMsv] of [[crew.alice, "dosi-alpha", 182], [crew.bob, "dosi-bravo", 96]] as const) {
+  const values: string[] = [];
+  let total = startMsv;
+  for (let i = 0; i < minutes; i += 5) {
+    const at = new Date(start + i * 60_000).toISOString();
+    const rate = 72 + (i % 7);
+    total += (rate * 5) / 60 / 1000;
+    values.push(`('${member}', 'radiation_dose_rate', ${rate}, 'µSv/h', '${at}', '${device}', 99)`);
+    values.push(`('${member}', 'cumulative_radiation_dose', ${total.toFixed(4)}, 'mSv', '${at}', '${device}', 99)`);
+  }
+  await asRole(db, "authenticated",
+    `insert into crew_telemetry (crew_member_id, metric, value, unit, recorded_at, device_id, signal_quality) values ${values.join(",")}`,
+    [], USERS.gateway);
+}
+
 // Alerts raised by the sensor gateway; Alice overrides the CAUTION.
 await asRole(db, "authenticated",
   `insert into health_alerts (crew_member_id, metric, severity, message) values

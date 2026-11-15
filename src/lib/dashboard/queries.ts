@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import type { LinkStatus, Snapshot } from "./types";
+import { METRICS, type ChartedMetric } from "./vital-thresholds";
 
 type Client = SupabaseClient<Database>;
 
@@ -43,6 +44,36 @@ export async function loadSnapshot(client: Client): Promise<Snapshot> {
     acoustics: acoustics.data ?? [],
     fetchedAt: new Date().toISOString(),
   };
+}
+
+export type TrendSeries = Record<ChartedMetric, { t: number; v: number }[]>;
+
+/**
+ * One crew member's charted vitals since `sinceMs`, ascending. One request per
+ * metric keeps each under PostgREST's 1,000-row cap (6 h at 1/min = 360).
+ */
+export async function loadTrends(client: Client, crewMemberId: string, sinceMs: number): Promise<TrendSeries> {
+  const since = new Date(sinceMs).toISOString();
+  const results = await Promise.all(
+    METRICS.map((m) =>
+      client
+        .from("crew_telemetry")
+        .select("value, recorded_at")
+        .eq("crew_member_id", crewMemberId)
+        .eq("metric", m.key)
+        .is("deleted_at", null)
+        .gte("recorded_at", since)
+        .order("recorded_at", { ascending: true })
+        .limit(1000),
+    ),
+  );
+  const out = {} as TrendSeries;
+  METRICS.forEach((m, i) => {
+    const r = results[i]!;
+    if (r.error) throw new Error(r.error.message || "trend query failed");
+    out[m.key] = (r.data ?? []).map((row) => ({ t: Date.parse(row.recorded_at), v: row.value }));
+  });
+  return out;
 }
 
 export interface LinkSummary {

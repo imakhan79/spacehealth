@@ -1,18 +1,10 @@
 import { HeartPulse } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CrewMember, Vital } from "@/lib/dashboard/types";
+import { METRICS, toneOf, type Tone } from "@/lib/dashboard/vital-thresholds";
 import { cn, timeAgo } from "@/lib/utils";
 
 const STALE_MS = 5 * 60_000;
-
-type Tone = "normal" | "caution" | "emergency";
-
-const METRICS: { key: Vital["metric"]; label: string; digits: number; tone: (v: number) => Tone }[] = [
-  { key: "heart_rate", label: "Heart rate", digits: 0, tone: (v) => (v > 140 || v < 40 ? "emergency" : v > 110 ? "caution" : "normal") },
-  { key: "spo2", label: "SpO₂", digits: 0, tone: (v) => (v < 90 ? "emergency" : v < 94 ? "caution" : "normal") },
-  { key: "respiratory_rate", label: "Resp. rate", digits: 0, tone: (v) => (v > 30 || v < 8 ? "emergency" : v > 22 ? "caution" : "normal") },
-  { key: "core_body_temp", label: "Core temp", digits: 1, tone: (v) => (v > 39 || v < 35 ? "emergency" : v > 38 ? "caution" : "normal") },
-];
 
 const TONE_CLASS: Record<Tone, string> = {
   normal: "text-foreground",
@@ -77,7 +69,7 @@ export function CrewVitals({ crew, vitals }: { crew: CrewMember[]; vitals: Vital
                   <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
                     {METRICS.map((m) => {
                       const sample = samples.find((s) => s.metric === m.key);
-                      const tone = sample ? m.tone(sample.value) : "normal";
+                      const tone = sample ? toneOf(m, sample.value) : "normal";
                       return (
                         <div key={m.key}>
                           <dt className="text-xs text-muted-foreground">{m.label}</dt>

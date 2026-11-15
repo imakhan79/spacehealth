@@ -3,8 +3,9 @@
 -- which the real schema forbids for medical records. That is why it lives in
 -- scripts/ and not in supabase/migrations/.
 --
--- Every minute: one sample per vital per demo crew member, and a cabin noise
--- window every 5 minutes. Demo rows older than 6 hours are pruned.
+-- Every minute: one sample per vital per demo crew member. Every 5 minutes: a
+-- dosimeter reading (dose rate + running career total) and a cabin noise
+-- window. Demo rows older than 6 hours are pruned.
 -- Every 30 minutes: the alert scenario is reset with fresh timestamps, undoing
 -- whatever demo visitors acknowledged or overrode.
 --
@@ -48,6 +49,31 @@ begin
   end loop;
 
   if extract(minute from v_now)::int % 5 = 0 then
+    -- Dosimetry: deep-space background (~75 µSv/h) and a running career total
+    -- that grows by rate × 5 min from each member's last reading.
+    for c in
+      select cm.id, cm.callsign,
+             (select t.value from public.crew_telemetry t
+               where t.crew_member_id = cm.id and t.metric = 'cumulative_radiation_dose'
+               order by t.recorded_at desc limit 1) as last_total
+      from public.crew_members cm
+      where cm.callsign in ('CDR', 'SURGEON', 'MS1') and cm.deleted_at is null
+    loop
+      declare
+        v_rate double precision := round((75 + v_wave * 6 + (random() - 0.5) * 8)::numeric, 1);
+        v_total double precision := coalesce(c.last_total,
+          case c.callsign when 'CDR' then 182.0 when 'SURGEON' then 96.0 else 41.0 end);
+      begin
+        insert into public.crew_telemetry
+          (crew_member_id, metric, value, unit, recorded_at, device_id, signal_quality, hold_onboard)
+        values
+          (c.id, 'radiation_dose_rate', v_rate, 'µSv/h', v_now, 'demo-dosimeter', 99, true),
+          (c.id, 'cumulative_radiation_dose', round((v_total + v_rate * 5 / 60 / 1000)::numeric, 4),
+            'mSv', v_now, 'demo-dosimeter', 99, true)
+        on conflict on constraint crew_telemetry_sample_unique do nothing;
+      end;
+    end loop;
+
     insert into public.ambient_acoustics
       (module_id, sensor_id, window_start, window_seconds, laeq_dba, lmax_dba, limit_exceeded, hold_onboard)
     select m.module_id, m.module_id || '-mic1', v_now - interval '5 minutes', 300,
@@ -59,8 +85,9 @@ begin
   end if;
 
   -- Demo rows only (fake device, never queued). Real records are never deleted.
+  -- The dosimeter's running total is kept: the newest row carries it forward.
   delete from public.crew_telemetry
-   where device_id = 'demo-wearable' and hold_onboard and recorded_at < v_now - interval '6 hours'
+   where device_id in ('demo-wearable', 'demo-dosimeter') and hold_onboard and recorded_at < v_now - interval '6 hours'
      and not exists (select 1 from public.health_alerts a where a.telemetry_id = crew_telemetry.id);
   delete from public.ambient_acoustics
    where sensor_id like '%-mic1' and hold_onboard and window_start < v_now - interval '6 hours';

@@ -25,6 +25,10 @@
   --color-caution: #d29922;
   --color-warning: #f0883e;
   --color-emergency: #ff5c57;
+
+  /* Single data series in charts (trend lines). Validated against --color-card
+     with the dataviz palette checks: lightness band and >= 3:1 contrast. */
+  --color-series: #4493f0;
 }
 
 html {

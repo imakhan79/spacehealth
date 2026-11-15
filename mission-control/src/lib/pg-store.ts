@@ -5,7 +5,9 @@ import {
   type BatchResponse,
   type UplinkEnvelope,
 } from "../../../packages/uplink-protocol/index.ts";
+import { METRICS, isChartedMetric, type ChartedMetric } from "../../../packages/vital-thresholds/index.ts";
 import type { EarthStore } from "./handlers.ts";
+import type { LinkBatch } from "./link-stats.ts";
 
 // Direct Postgres access as the least-privilege omni_ingest role (Supabase
 // transaction pooler). One small pool per serverless instance.
@@ -216,6 +218,75 @@ export async function crewHealth(connectionString: string): Promise<CrewHealth> 
     }),
     lastBatchAt: lastAt instanceof Date ? lastAt.toISOString() : nullableStr(lastAt),
   };
+}
+
+export interface CrewTrends {
+  /** Time of the newest sample received for this member; the chart window ends here. */
+  endsAt: string | null;
+  series: Record<ChartedMetric, { t: number; v: number }[]>;
+}
+
+/**
+ * One crew member's charted vitals over `rangeMs`, ending at their newest
+ * replicated sample. Earth only knows what the last uplink delivered, so the
+ * window is anchored to the data, not to the wall clock.
+ */
+export async function crewTrends(connectionString: string, crewMemberId: string, rangeMs: number): Promise<CrewTrends> {
+  const db = getPool(connectionString);
+  const metrics = METRICS.map((m) => m.key);
+  const { rows } = await db.query(
+    `with mine as (
+       select payload from public.spacecraft_records
+        where source_table = 'crew_telemetry'
+          and payload->>'crew_member_id' = $1
+          and payload->>'metric' = any($2::text[])
+          and payload->>'deleted_at' is null
+     ), latest as (
+       select max((payload->>'recorded_at')::timestamptz) as at from mine
+     )
+     select payload->>'metric' as metric, (payload->>'value')::float8 as value,
+            (payload->>'recorded_at')::timestamptz as recorded_at, latest.at as ends_at
+       from mine, latest
+      where (payload->>'recorded_at')::timestamptz > latest.at - make_interval(secs => $3::float8 / 1000)
+      order by recorded_at`,
+    [crewMemberId, metrics, rangeMs],
+  );
+  const series = Object.fromEntries(metrics.map((k) => [k, [] as { t: number; v: number }[]])) as CrewTrends["series"];
+  let endsAt: string | null = null;
+  for (const r of rows as { metric: string; value: number; recorded_at: Date; ends_at: Date }[]) {
+    if (!isChartedMetric(r.metric) || !Number.isFinite(r.value)) continue;
+    series[r.metric].push({ t: r.recorded_at.getTime(), v: r.value });
+    endsAt ??= r.ends_at.toISOString();
+  }
+  return { endsAt, series };
+}
+
+/**
+ * Batches received since `sinceMs`, plus the newest one before it (so the
+ * health summary knows when contact last happened before the window).
+ */
+export async function linkBatches(connectionString: string, sinceMs: number): Promise<LinkBatch[]> {
+  const db = getPool(connectionString);
+  const { rows } = await db.query(
+    `with picked as (
+       (select * from public.uplink_batches where received_at >= $1 order by received_at limit 2000)
+       union all
+       (select * from public.uplink_batches where received_at < $1 order by received_at desc limit 1)
+     )
+     select p.batch_id, p.received_at, p.envelope_created_at, p.entry_count, p.compressed_bytes,
+            (select count(*) from public.spacecraft_record_conflicts c where c.batch_id = p.batch_id)::int as conflicts
+       from picked p
+      order by p.received_at`,
+    [new Date(sinceMs).toISOString()],
+  );
+  return (rows as Record<string, unknown>[]).map((r) => ({
+    batchId: str(r.batch_id),
+    receivedAt: new Date(r.received_at as Date).getTime(),
+    createdAt: new Date(r.envelope_created_at as Date).getTime(),
+    entries: Number(r.entry_count),
+    bytes: Number(r.compressed_bytes),
+    conflicts: Number(r.conflicts),
+  }));
 }
 
 export async function overview(connectionString: string): Promise<Overview> {
