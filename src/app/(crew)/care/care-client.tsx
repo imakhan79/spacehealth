@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Bike, Dumbbell, Footprints, HeartHandshake, Package, Pill } from "lucide-react";
+import { Activity, Bike, Dumbbell, Footprints, Gauge, HeartHandshake, Package, Pill } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,8 @@ import {
   type SlotStatus,
 } from "@/lib/care";
 import type { Me } from "@/lib/dashboard/types";
+import { METRICS, toneOf, type Tone } from "@/lib/dashboard/vital-thresholds";
+import { BAND_TEXT, readiness, type ReadinessBand } from "@/lib/readiness";
 import type { Enums, Tables } from "@/types/database.types";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +31,8 @@ interface CareData {
   kit: Tables<"medical_inventory">[];
   rx: Tables<"exercise_prescriptions">[];
   sessions: Tables<"exercise_sessions">[];
+  vitals: Pick<Tables<"crew_telemetry">, "crew_member_id" | "metric" | "value" | "recorded_at">[];
+  alerts: Pick<Tables<"health_alerts">, "crew_member_id" | "severity">[];
 }
 
 const REFRESH_MS = 30_000;
@@ -47,7 +51,7 @@ export function CareClient({ me }: { me: Me | null }) {
     if (client === null) return;
     const t = Date.now();
     const since14 = new Date(t - 13 * DAY).toISOString().slice(0, 10);
-    const [crew, checkins, meds, doses, kit, rx, sessions] = await Promise.all([
+    const [crew, checkins, meds, doses, kit, rx, sessions, vitals, alerts] = await Promise.all([
       client.from("crew_members").select("id, callsign, full_name, role").eq("is_active", true).neq("role", "sensor_gateway").order("callsign"),
       client.from("wellness_checkins").select("*").gte("checkin_date", since14).order("checkin_date", { ascending: false }),
       client.from("medications").select("*").eq("active", true).order("name"),
@@ -55,9 +59,17 @@ export function CareClient({ me }: { me: Me | null }) {
       client.from("medical_inventory").select("*").order("category").order("item"),
       client.from("exercise_prescriptions").select("*"),
       client.from("exercise_sessions").select("*").gte("performed_at", new Date(t - 7 * DAY).toISOString()).order("performed_at", { ascending: false }),
+      client
+        .from("crew_telemetry")
+        .select("crew_member_id, metric, value, recorded_at")
+        .in("metric", METRICS.map((m) => m.key))
+        .gte("recorded_at", new Date(t - 10 * 60_000).toISOString())
+        .order("recorded_at", { ascending: false })
+        .limit(400),
+      client.from("health_alerts").select("crew_member_id, severity").eq("status", "active"),
     ]);
     setNow(t);
-    const failed = [crew, checkins, meds, doses, kit, rx, sessions].find((r) => r.error);
+    const failed = [crew, checkins, meds, doses, kit, rx, sessions, vitals, alerts].find((r) => r.error);
     if (failed) {
       setError("Station server not responding; showing the last data loaded.");
       return;
@@ -71,6 +83,8 @@ export function CareClient({ me }: { me: Me | null }) {
       kit: kit.data ?? [],
       rx: rx.data ?? [],
       sessions: sessions.data ?? [],
+      vitals: vitals.data ?? [],
+      alerts: alerts.data ?? [],
     });
   }, [client]);
 
@@ -92,12 +106,99 @@ export function CareClient({ me }: { me: Me | null }) {
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
         <>
+          <ReadinessSection data={data} now={now} />
           <Wellness data={data} me={me} oversight={oversight} now={now} onSaved={load} />
           <Medications data={data} me={me} oversight={oversight} now={now} onChanged={load} />
           <Exercise data={data} me={me} oversight={oversight} now={now} onLogged={load} />
         </>
       )}
     </div>
+  );
+}
+
+// --- readiness --------------------------------------------------------------------
+
+const BAND_STYLE: Record<ReadinessBand, { badge: "ok" | "caution" | "warning"; text: string }> = {
+  ready: { badge: "ok", text: "text-ok" },
+  monitor: { badge: "caution", text: "text-caution" },
+  review: { badge: "warning", text: "text-warning" },
+};
+const SEVERITY_ORDER = ["advisory", "caution", "warning", "emergency"] as const;
+
+function ReadinessSection({ data, now }: { data: CareData; now: number }) {
+  const today = new Date(now).toISOString().slice(0, 10);
+  const scored = data.crew
+    .map((c) => {
+      const checkin = data.checkins.find((x) => x.crew_member_id === c.id && x.checkin_date === today) ?? null;
+      const vitals = data.vitals.filter((v) => v.crew_member_id === c.id);
+      if (!checkin && vitals.length === 0) return null; // RLS: not ours to see
+      // Worst tone across each metric's newest sample.
+      let vitalsTone: Tone | null = null;
+      for (const m of METRICS) {
+        const v = vitals.find((x) => x.metric === m.key);
+        if (!v) continue;
+        const t = toneOf(m, v.value);
+        if (t === "emergency" || (t === "caution" && vitalsTone !== "emergency") || vitalsTone === null) vitalsTone = t;
+      }
+      const sev = data.alerts.filter((a) => a.crew_member_id === c.id).map((a) => a.severity);
+      const openAlert = sev.length ? [...sev].sort((a, b) => SEVERITY_ORDER.indexOf(b) - SEVERITY_ORDER.indexOf(a))[0]! : null;
+      const shares = (["treadmill", "resistance", "cycle"] as const)
+        .map((k) => {
+          const rx = data.rx.find((r) => r.crew_member_id === c.id && r.kind === k)?.weekly_minutes ?? 0;
+          return adherence(data.sessions.filter((s) => s.crew_member_id === c.id && s.kind === k).map((s) => ({ minutes: s.minutes, performedAt: Date.parse(s.performed_at) })), rx, now).share;
+        })
+        .filter((x): x is number => x !== null);
+      const missed = data.meds
+        .filter((m) => m.crew_member_id === c.id)
+        .flatMap((m) => doseSlots(m.schedule_utc.map((x) => x.slice(0, 5)), data.doses.filter((d) => d.medication_id === m.id).map((d) => ({ dueAt: Date.parse(d.due_at), takenAt: Date.parse(d.taken_at) })), now))
+        .filter((sl) => sl.status === "missed").length;
+      const r = readiness({
+        checkin: checkin ? { sleep_hours: Number(checkin.sleep_hours), fatigue: checkin.fatigue, mood: checkin.mood, symptoms: checkin.symptoms } : null,
+        vitalsTone,
+        openAlert,
+        exerciseShare: shares.length ? shares.reduce((a, b) => a + b, 0) / shares.length : null,
+        missedDosesToday: missed,
+      });
+      return { member: c, r };
+    })
+    .filter((x) => x !== null);
+
+  if (scored.length === 0) return null;
+  return (
+    <section aria-labelledby="readiness-heading" className="flex flex-col gap-3">
+      <h2 id="readiness-heading" className="flex items-center gap-2 text-lg font-semibold">
+        <Gauge className="size-4 text-info" aria-hidden /> Readiness today
+      </h2>
+      <p className="text-sm text-muted-foreground">
+        100 minus the listed deductions, from today&apos;s check-in, latest vitals, open alerts, exercise and doses. A prompt for a conversation, not a diagnosis.
+      </p>
+      <div className="grid gap-4 md:grid-cols-3">
+        {scored.map(({ member, r }) => (
+          <Card key={member.id}>
+            <CardContent className="flex flex-col gap-2 p-4">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-semibold">{member.callsign}</span>
+                <Badge variant={BAND_STYLE[r.band].badge}>{BAND_TEXT[r.band]}</Badge>
+              </div>
+              <div className={cn("text-5xl font-semibold", BAND_STYLE[r.band].text)}>{r.score}</div>
+              {r.deductions.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No deductions.</p>
+              ) : (
+                <ul className="flex flex-col gap-0.5 text-xs">
+                  {r.deductions.map((d) => (
+                    <li key={d.reason} className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">{d.reason}</span>
+                      <span className="tabular-nums">−{d.points}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {r.incomplete && <p className="text-xs text-caution">No check-in today: scored on vitals, alerts, exercise and doses only.</p>}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </section>
   );
 }
 

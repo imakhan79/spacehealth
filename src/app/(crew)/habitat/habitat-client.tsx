@@ -7,15 +7,17 @@ import { useConnectivity } from "@/components/connectivity-provider";
 import type { Me } from "@/lib/dashboard/types";
 import { doseRateTone } from "@/lib/dashboard/vital-thresholds";
 import { DOSE_EDGES, HATCHES, MODULES, NOISE_EDGES, binOf } from "@/lib/habitat";
+import { CO2_EDGES, assessAir, type AirReading } from "@/lib/air";
 import type { Tables } from "@/types/database.types";
 import { cn, timeAgo } from "@/lib/utils";
 
-type Layer = "noise" | "radiation";
+type Layer = "noise" | "radiation" | "air";
 interface HabitatData {
   crew: Pick<Tables<"crew_members">, "id" | "callsign">[];
   locations: Tables<"crew_locations">[];
   noise: Map<string, { laeq: number; limit: boolean; at: string }>;
   dose: Map<string, { rate: number; at: string }>; // per crew member
+  air: Map<string, AirReading & { at: string }>;
 }
 
 const REFRESH_MS = 15_000;
@@ -32,7 +34,7 @@ export function HabitatClient({ me }: { me: Me | null }) {
 
   const load = useCallback(async (): Promise<void> => {
     if (client === null) return;
-    const [crew, locations, acoustics, dose] = await Promise.all([
+    const [crew, locations, acoustics, dose, air] = await Promise.all([
       client.from("crew_members").select("id, callsign").eq("is_active", true).neq("role", "sensor_gateway").order("callsign"),
       client.from("crew_locations").select("*"),
       client.from("ambient_acoustics").select("module_id, laeq_dba, limit_exceeded, window_start").order("window_start", { ascending: false }).limit(60),
@@ -43,9 +45,10 @@ export function HabitatClient({ me }: { me: Me | null }) {
         .gte("recorded_at", new Date(Date.now() - 30 * 60_000).toISOString())
         .order("recorded_at", { ascending: false })
         .limit(200),
+      client.from("cabin_air").select("module_id, co2_ppm, o2_pct, humidity_pct, temp_c, window_start").order("window_start", { ascending: false }).limit(80),
     ]);
     setNow(Date.now());
-    if ([crew, locations, acoustics, dose].some((r) => r.error)) {
+    if ([crew, locations, acoustics, dose, air].some((r) => r.error)) {
       setError("Station server not responding; showing the last data loaded.");
       return;
     }
@@ -54,7 +57,9 @@ export function HabitatClient({ me }: { me: Me | null }) {
     for (const a of acoustics.data ?? []) if (!noise.has(a.module_id)) noise.set(a.module_id, { laeq: a.laeq_dba, limit: a.limit_exceeded, at: a.window_start });
     const doseBy = new Map<string, { rate: number; at: string }>();
     for (const d of dose.data ?? []) if (!doseBy.has(d.crew_member_id)) doseBy.set(d.crew_member_id, { rate: d.value, at: d.recorded_at });
-    setData({ crew: crew.data ?? [], locations: locations.data ?? [], noise, dose: doseBy });
+    const airBy = new Map<string, AirReading & { at: string }>();
+    for (const a of air.data ?? []) if (!airBy.has(a.module_id)) airBy.set(a.module_id, { ...a, at: a.window_start });
+    setData({ crew: crew.data ?? [], locations: locations.data ?? [], noise, dose: doseBy, air: airBy });
   }, [client]);
 
   useEffect(() => {
@@ -79,22 +84,25 @@ export function HabitatClient({ me }: { me: Me | null }) {
     const n = data?.noise.get(m.id) ?? null;
     const rates = here.map((id) => data?.dose.get(id)?.rate).filter((r): r is number => r !== undefined);
     const rate = rates.length ? Math.max(...rates) : null;
-    return { m, here, noise: n, rate };
+    const airNow = data?.air.get(m.id) ?? null;
+    return { m, here, noise: n, rate, air: airNow, airCheck: airNow ? assessAir(airNow) : null };
   });
 
-  const valueOf = (r: (typeof rows)[number]) => (layer === "noise" ? (r.noise?.laeq ?? null) : r.rate);
+  const valueOf = (r: (typeof rows)[number]) => (layer === "noise" ? (r.noise?.laeq ?? null) : layer === "air" ? (r.air?.co2_ppm ?? null) : r.rate);
   const flagOf = (r: (typeof rows)[number]): string | null => {
     if (layer === "noise") return r.noise?.limit ? "Over limit" : null;
+    if (layer === "air") return r.airCheck?.tone === "emergency" ? "Ventilate now" : r.airCheck?.tone === "caution" ? "Check air" : null;
     if (r.rate === null) return null;
     const t = doseRateTone(r.rate);
     return t === "emergency" ? "Shelter now" : t === "caution" ? "Elevated" : null;
   };
   const fmt = (r: (typeof rows)[number]) => {
     const v = valueOf(r);
-    if (v === null) return layer === "noise" ? (r.m.acoustic ? "no reading" : "no sensor") : "—";
+    if (v === null) return layer === "noise" ? (r.m.acoustic ? "no reading" : "no sensor") : layer === "air" ? "no sensor" : "—";
+    if (layer === "air") return `${Math.round(v).toLocaleString("en-US")} ppm CO₂`;
     return layer === "noise" ? `${v.toFixed(1)} dBA` : `${Math.round(v).toLocaleString("en-US")} µSv/h`;
   };
-  const edges = layer === "noise" ? NOISE_EDGES : DOSE_EDGES;
+  const edges = layer === "noise" ? NOISE_EDGES : layer === "air" ? CO2_EDGES : DOSE_EDGES;
   const centre = (id: string) => {
     const m = MODULES.find((x) => x.id === id)!;
     return { x: m.x + m.w / 2, y: m.y + m.h / 2 };
@@ -108,7 +116,7 @@ export function HabitatClient({ me }: { me: Me | null }) {
 
       <div className="flex flex-wrap items-center gap-3">
         <div role="radiogroup" aria-label="Map layer" className="flex rounded-md border border-border p-0.5">
-          {(["noise", "radiation"] as const).map((l) => (
+          {(["noise", "air", "radiation"] as const).map((l) => (
             <button
               key={l}
               role="radio"
@@ -116,7 +124,7 @@ export function HabitatClient({ me }: { me: Me | null }) {
               onClick={() => setLayer(l)}
               className={cn("h-8 rounded px-3 text-sm", layer === l ? "bg-muted font-semibold" : "text-muted-foreground hover:text-foreground")}
             >
-              {l === "noise" ? "Noise (LAeq)" : "Radiation (dose rate)"}
+              {l === "noise" ? "Noise (LAeq)" : l === "air" ? "Air (CO₂)" : "Radiation (dose rate)"}
             </button>
           ))}
         </div>
@@ -142,7 +150,7 @@ export function HabitatClient({ me }: { me: Me | null }) {
       <Card>
         <CardContent className="p-3">
           <div className="overflow-x-auto">
-            <svg viewBox="0 0 1000 330" className="h-auto w-full min-w-[640px]" role="img" aria-label={`Habitat map, ${layer === "noise" ? "noise" : "radiation"} layer. Details in the table below.`}>
+            <svg viewBox="0 0 1000 330" className="h-auto w-full min-w-[640px]" role="img" aria-label={`Habitat map, ${layer} layer. Details in the table below.`}>
               {HATCHES.map(([a, b]) => {
                 const p = centre(a);
                 const q = centre(b);
@@ -151,7 +159,7 @@ export function HabitatClient({ me }: { me: Me | null }) {
               {rows.map((r) => {
                 const bin = binOf(valueOf(r), edges);
                 const flag = flagOf(r);
-                const severe = flag === "Shelter now";
+                const severe = flag === "Shelter now" || flag === "Ventilate now";
                 return (
                   <g
                     key={r.m.id}
@@ -204,15 +212,19 @@ export function HabitatClient({ me }: { me: Me | null }) {
                 <span key={i} className="inline-block h-3 w-5 rounded-sm bg-series" style={{ opacity: o }} aria-hidden />
               ))}
               <span className="ml-1">
-                {layer === "noise" ? `quieter → louder (steps at ${NOISE_EDGES.join(", ")} dBA)` : `lower → higher (steps at ${DOSE_EDGES.join(", ")} µSv/h)`}
+                {layer === "noise"
+                  ? `quieter → louder (steps at ${NOISE_EDGES.join(", ")} dBA)`
+                  : layer === "air"
+                    ? `fresher → more CO₂ (steps at ${CO2_EDGES.join(", ")} ppm)`
+                    : `lower → higher (steps at ${DOSE_EDGES.join(", ")} µSv/h)`}
               </span>
             </span>
             <span className="flex items-center gap-1">
-              <span className="inline-block h-3 w-5 rounded-sm border-2 border-warning" aria-hidden /> {layer === "noise" ? "over noise limit" : "elevated"}
+              <span className="inline-block h-3 w-5 rounded-sm border-2 border-warning" aria-hidden /> {layer === "noise" ? "over noise limit" : layer === "air" ? "air needs checking" : "elevated"}
             </span>
-            {layer === "radiation" && (
+            {layer !== "noise" && (
               <span className="flex items-center gap-1">
-                <span className="inline-block h-3 w-5 rounded-sm border-2 border-emergency" aria-hidden /> shelter now
+                <span className="inline-block h-3 w-5 rounded-sm border-2 border-emergency" aria-hidden /> {layer === "air" ? "ventilate now" : "shelter now"}
               </span>
             )}
             <span>Radiation per module = highest dose rate among the crew dosimeters there.</span>
@@ -226,6 +238,7 @@ export function HabitatClient({ me }: { me: Me | null }) {
             <tr>
               <th className="px-3 py-2 font-medium">Module</th>
               <th className="px-3 py-2 font-medium">Noise</th>
+              <th className="px-3 py-2 font-medium">Air (CO₂ · O₂ · RH · T)</th>
               <th className="px-3 py-2 font-medium">Dose rate</th>
               <th className="px-3 py-2 font-medium">Crew here</th>
             </tr>
@@ -236,6 +249,22 @@ export function HabitatClient({ me }: { me: Me | null }) {
                 <td className="px-3 py-1.5 font-semibold">{r.m.name}</td>
                 <td className="px-3 py-1.5 tabular-nums">
                   {r.noise ? `${r.noise.laeq.toFixed(1)} dBA${r.noise.limit ? " · over limit" : ""} · ${timeAgo(r.noise.at, now)}` : r.m.acoustic ? "no reading" : "no sensor"}
+                </td>
+                <td className="px-3 py-1.5 tabular-nums">
+                  {r.air ? (
+                    <>
+                      {Math.round(r.air.co2_ppm).toLocaleString("en-US")} ppm · {r.air.o2_pct.toFixed(1)}% · {Math.round(r.air.humidity_pct)}% · {r.air.temp_c.toFixed(1)} °C
+                      {r.airCheck && r.airCheck.issues.length > 0 && (
+                        <ul className={cn("text-xs", r.airCheck.tone === "emergency" ? "text-emergency" : "text-caution")}>
+                          {r.airCheck.issues.map((i) => (
+                            <li key={i}>{i}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  ) : (
+                    "no sensor"
+                  )}
                 </td>
                 <td className="px-3 py-1.5 tabular-nums">{r.rate === null ? "—" : `${Math.round(r.rate).toLocaleString("en-US")} µSv/h`}</td>
                 <td className="px-3 py-1.5">{r.here.map((id) => callsign.get(id) ?? "crew").join(", ") || "—"}</td>

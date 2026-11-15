@@ -78,11 +78,12 @@ begin
 
   -- A week of exercise: CDR on target, SURGEON partial, MS1 behind.
   insert into public.exercise_sessions (crew_member_id, kind, minutes, performed_at)
+  -- Fixed pattern (not random): CDR trains daily, SURGEON 2 days in 3, MS1 1 in 3.
   select c.id, k.kind::public.exercise_kind, k.minutes, now() - make_interval(days => d, hours => k.hour_offset)
-    from (values (v_cdr, 1.0), (v_cmo, 0.6), (v_ms1, 0.35)) c(id, effort)
+    from (values (v_cdr, 1), (v_cmo, 2), (v_ms1, 3)) c(id, every)
    cross join generate_series(1, 6) d
    cross join (values ('treadmill', 25, 3), ('resistance', 30, 6), ('cycle', 15, 9)) k(kind, minutes, hour_offset)
-   where random() < c.effort;
+   where c.every = 1 or (c.every = 2 and d % 3 <> 0) or (c.every = 3 and d % 3 = 0);
 
   insert into public.crew_locations (crew_member_id, module_id) values
     (v_cdr, 'galley'), (v_cmo, 'lab'), (v_ms1, 'habitat-a');

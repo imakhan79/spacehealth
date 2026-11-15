@@ -1,4 +1,4 @@
-// Mirrors supabase/migrations/*.sql (core schema, uplink relay, ground messages, crew care).
+// Mirrors supabase/migrations/*.sql (core schema, uplink relay, ground messages, crew care, air and procedures).
 // Once the local stack is up (Phase 2), regenerate with:
 //   supabase gen types typescript --db-url "$OMNI_DB_URL" --schema public > src/types/database.types.ts
 
@@ -180,6 +180,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      // supabase/migrations/20261115000500_air_and_procedures.sql
+      cabin_air: {
+        Row: {
+          id: string
+          module_id: string
+          sensor_id: string
+          window_start: string
+          co2_ppm: number
+          o2_pct: number
+          humidity_pct: number
+          temp_c: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          module_id: string
+          sensor_id: string
+          window_start: string
+          co2_ppm: number
+          o2_pct: number
+          humidity_pct: number
+          temp_c: number
+          created_at?: string
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
+      procedure_runs: {
+        Row: {
+          id: string
+          protocol: string
+          patient_crew_id: string
+          started_by: string
+          started_at: string
+          outcome: Database["public"]["Enums"]["procedure_outcome"]
+          ended_at: string | null
+          ended_by: string | null
+          notes: string | null
+        }
+        Insert: {
+          id?: string
+          protocol: string
+          patient_crew_id: string
+          started_by?: string
+          started_at?: string
+          outcome?: Database["public"]["Enums"]["procedure_outcome"]
+          ended_at?: string | null
+          ended_by?: string | null
+          notes?: string | null
+        }
+        Update: {
+          outcome?: Database["public"]["Enums"]["procedure_outcome"]
+          notes?: string | null
+        }
+        Relationships: []
+      }
+      procedure_steps: {
+        Row: {
+          run_id: string
+          step_no: number
+          done_by: string
+          done_at: string
+        }
+        Insert: {
+          run_id: string
+          step_no: number
+          done_by?: string
+          done_at?: string
+        }
+        Update: Record<string, never>
+        Relationships: []
       }
       // supabase/migrations/20261115000400_crew_care.sql
       wellness_checkins: {
@@ -516,6 +588,7 @@ export type Database = {
       }
     }
     Enums: {
+      procedure_outcome: "in_progress" | "completed" | "aborted"
       exercise_kind: "treadmill" | "resistance" | "cycle"
       message_priority: "routine" | "urgent"
       sync_status: "local_only" | "queued_for_earth" | "in_flight" | "synced" | "conflict"
@@ -556,6 +629,7 @@ export type Enums<T extends keyof PublicSchema["Enums"]> = PublicSchema["Enums"]
 export const Constants = {
   public: {
     Enums: {
+      procedure_outcome: ["in_progress", "completed", "aborted"],
       exercise_kind: ["treadmill", "resistance", "cycle"],
       message_priority: ["routine", "urgent"],
       sync_status: ["local_only", "queued_for_earth", "in_flight", "synced", "conflict"],

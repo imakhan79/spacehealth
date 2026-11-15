@@ -1,4 +1,4 @@
-import { Activity, ClipboardList, HeartHandshake, Map as MapIcon } from "lucide-react";
+import { Activity, ClipboardList, HeartHandshake, History, Map as MapIcon, Siren } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ConnectivityProvider } from "@/components/connectivity-provider";
@@ -38,6 +38,14 @@ export default async function CrewLayout({ children }: { children: ReactNode }) 
             <Link href="/habitat" className="flex items-center gap-1 hover:text-foreground">
               <MapIcon className="size-4" aria-hidden />
               <span className="hidden sm:inline">Habitat</span>
+            </Link>
+            <Link href="/procedures" className="flex items-center gap-1 hover:text-foreground">
+              <Siren className="size-4" aria-hidden />
+              <span className="hidden md:inline">Procedures</span>
+            </Link>
+            <Link href="/timeline" className="flex items-center gap-1 hover:text-foreground">
+              <History className="size-4" aria-hidden />
+              <span className="hidden md:inline">Timeline</span>
             </Link>
             <Link href="/handover" className="flex items-center gap-1 hover:text-foreground">
               <ClipboardList className="size-4" aria-hidden />
