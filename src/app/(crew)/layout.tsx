@@ -1,4 +1,4 @@
-import { Activity, ClipboardList } from "lucide-react";
+import { Activity, ClipboardList, HeartHandshake, Map as MapIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ConnectivityProvider } from "@/components/connectivity-provider";
@@ -31,6 +31,14 @@ export default async function CrewLayout({ children }: { children: ReactNode }) 
                 {me.role && <span className="hidden sm:inline"> · {me.role.replace("_", " ")}</span>}
               </span>
             )}
+            <Link href="/care" className="flex items-center gap-1 hover:text-foreground">
+              <HeartHandshake className="size-4" aria-hidden />
+              <span className="hidden sm:inline">Care</span>
+            </Link>
+            <Link href="/habitat" className="flex items-center gap-1 hover:text-foreground">
+              <MapIcon className="size-4" aria-hidden />
+              <span className="hidden sm:inline">Habitat</span>
+            </Link>
             <Link href="/handover" className="flex items-center gap-1 hover:text-foreground">
               <ClipboardList className="size-4" aria-hidden />
               <span className="hidden sm:inline">Handover</span>

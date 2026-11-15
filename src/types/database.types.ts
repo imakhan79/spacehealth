@@ -1,4 +1,4 @@
-// Mirrors supabase/migrations/*.sql (core schema, uplink relay, ground messages).
+// Mirrors supabase/migrations/*.sql (core schema, uplink relay, ground messages, crew care).
 // Once the local stack is up (Phase 2), regenerate with:
 //   supabase gen types typescript --db-url "$OMNI_DB_URL" --schema public > src/types/database.types.ts
 
@@ -181,6 +181,166 @@ export type Database = {
           },
         ]
       }
+      // supabase/migrations/20261115000400_crew_care.sql
+      wellness_checkins: {
+        Row: {
+          id: string
+          crew_member_id: string
+          checkin_date: string
+          sleep_hours: number
+          fatigue: number
+          mood: number
+          symptoms: string[]
+          note: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          crew_member_id?: string
+          checkin_date?: string
+          sleep_hours: number
+          fatigue: number
+          mood: number
+          symptoms?: string[]
+          note?: string | null
+          updated_at?: string
+        }
+        Update: {
+          sleep_hours?: number
+          fatigue?: number
+          mood?: number
+          symptoms?: string[]
+          note?: string | null
+        }
+        Relationships: []
+      }
+      medications: {
+        Row: {
+          id: string
+          crew_member_id: string
+          name: string
+          dose: string
+          instructions: string | null
+          schedule_utc: string[]
+          active: boolean
+          prescribed_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          crew_member_id: string
+          name: string
+          dose: string
+          instructions?: string | null
+          schedule_utc: string[]
+          active?: boolean
+          prescribed_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          active?: boolean
+          instructions?: string | null
+        }
+        Relationships: []
+      }
+      medication_doses: {
+        Row: {
+          id: string
+          medication_id: string
+          crew_member_id: string
+          due_at: string
+          taken_at: string
+        }
+        Insert: {
+          id?: string
+          medication_id: string
+          crew_member_id?: string
+          due_at: string
+          taken_at?: string
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
+      medical_inventory: {
+        Row: {
+          id: string
+          item: string
+          category: string
+          quantity: number
+          unit: string
+          min_quantity: number
+          expires_on: string | null
+          location: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          item: string
+          category: string
+          quantity: number
+          unit: string
+          min_quantity?: number
+          expires_on?: string | null
+          location: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          quantity?: number
+        }
+        Relationships: []
+      }
+      exercise_prescriptions: {
+        Row: {
+          crew_member_id: string
+          kind: Database["public"]["Enums"]["exercise_kind"]
+          weekly_minutes: number
+        }
+        Insert: {
+          crew_member_id: string
+          kind: Database["public"]["Enums"]["exercise_kind"]
+          weekly_minutes: number
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
+      exercise_sessions: {
+        Row: {
+          id: string
+          crew_member_id: string
+          kind: Database["public"]["Enums"]["exercise_kind"]
+          minutes: number
+          performed_at: string
+          note: string | null
+        }
+        Insert: {
+          id?: string
+          crew_member_id?: string
+          kind: Database["public"]["Enums"]["exercise_kind"]
+          minutes: number
+          performed_at?: string
+          note?: string | null
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
+      crew_locations: {
+        Row: {
+          crew_member_id: string
+          module_id: string
+          updated_at: string
+        }
+        Insert: {
+          crew_member_id?: string
+          module_id: string
+          updated_at?: string
+        }
+        Update: {
+          module_id?: string
+        }
+        Relationships: []
+      }
       // supabase/migrations/20261115000300_ground_messages.sql
       ground_messages: {
         Row: {
@@ -325,6 +485,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      use_medical_item: {
+        Args: { p_item: string; p_count?: number }
+        Returns: number | null
+      }
       // Ground demo database only (scripts/demo-live-vitals.sql), never aboard.
       demo_solar_drill: {
         Args: Record<PropertyKey, never>
@@ -352,6 +516,7 @@ export type Database = {
       }
     }
     Enums: {
+      exercise_kind: "treadmill" | "resistance" | "cycle"
       message_priority: "routine" | "urgent"
       sync_status: "local_only" | "queued_for_earth" | "in_flight" | "synced" | "conflict"
       crew_role: "crew" | "flight_surgeon" | "commander" | "sensor_gateway"
@@ -391,6 +556,7 @@ export type Enums<T extends keyof PublicSchema["Enums"]> = PublicSchema["Enums"]
 export const Constants = {
   public: {
     Enums: {
+      exercise_kind: ["treadmill", "resistance", "cycle"],
       message_priority: ["routine", "urgent"],
       sync_status: ["local_only", "queued_for_earth", "in_flight", "synced", "conflict"],
       crew_role: ["crew", "flight_surgeon", "commander", "sensor_gateway"],

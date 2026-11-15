@@ -243,6 +243,17 @@ begin
             v_now, true);
   end loop;
 
+  -- The simulated crew (not the visitor) head for the shelter. Done as each of
+  -- them, so the location rules apply; the caller's identity is restored after.
+  if to_regclass('public.crew_locations') is not null then
+    for c in select cm.auth_user_id from public.crew_members cm where cm.callsign in ('SURGEON', 'MS1') loop
+      perform set_config('request.jwt.claim.sub', c.auth_user_id::text, true);
+      insert into public.crew_locations (module_id) values ('shelter')
+      on conflict (crew_member_id) do update set module_id = excluded.module_id;
+    end loop;
+    perform set_config('request.jwt.claim.sub', '', true);
+  end if;
+
   insert into public.ground_messages (author, priority, subject, body, sent_at)
   values ('Space Weather Office', 'urgent', 'DRILL: solar particle event, shelter now',
           'DRILL. Proton flux rising fast after an X-class flare. All crew to the storm shelter now and stay until the dose rate is below 250 µSv/h. Bring your dosimeters and report headcount.',
