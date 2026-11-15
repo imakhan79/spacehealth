@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { ConnectivityProvider } from "@/components/connectivity-provider";
 import { NetworkStatus } from "@/components/network-status";
 import { getMe } from "@/lib/dashboard/me";
-import { serverSupabaseEnv } from "@/lib/supabase/config";
+import { demoLogin, serverSupabaseEnv } from "@/lib/supabase/config";
 import { NowProvider } from "@/lib/use-now";
 import { NavLinks } from "./nav-links";
 import { SignOutButton } from "./sign-out-button";
@@ -41,7 +41,8 @@ export default async function CrewLayout({ children }: { children: ReactNode }) 
                 </span>
               </span>
             )}
-            <SignOutButton />
+            {/* Ground demo opens with no login, so there is nothing to sign out of. */}
+            {demoLogin() === null && <SignOutButton />}
           </div>
         </div>
         <div className="mx-auto max-w-7xl px-4">

@@ -1,4 +1,5 @@
 import { Activity } from "lucide-react";
+import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { demoLogin } from "@/lib/supabase/config";
 import { LoginForm } from "./login-form";
@@ -8,6 +9,8 @@ export const dynamic = "force-dynamic";
 
 export default function LoginPage() {
   const demo = demoLogin();
+  // Ground demo: no login page at all; the dashboard signs the visitor in.
+  if (demo) redirect("/dashboard");
   return (
     <main className="flex min-h-dvh items-center justify-center px-4">
       <Card className="w-full max-w-sm">
