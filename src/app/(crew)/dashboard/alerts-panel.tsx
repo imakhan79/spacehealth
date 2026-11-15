@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { canPerform, type AlertAction } from "@/lib/dashboard/alert-mutations";
 import type { CrewMember, HealthAlert, Me } from "@/lib/dashboard/types";
-import { cn, timeAgo } from "@/lib/utils";
+import { Ago } from "@/lib/use-now";
+import { cn } from "@/lib/utils";
 
 const SEVERITY_RANK = { emergency: 0, warning: 1, caution: 2, advisory: 3 } as const;
 const STATUS_RANK = { active: 0, acknowledged: 1, overridden: 2, resolved: 3 } as const;
@@ -98,7 +99,7 @@ function AlertCard({
               {alert.severity.toUpperCase()}
             </Badge>
             <span className="text-sm font-semibold">{subject}</span>
-            <span className="text-xs text-muted-foreground">{timeAgo(alert.triggered_at)}</span>
+            <span className="text-xs text-muted-foreground"><Ago iso={alert.triggered_at} /></span>
           </div>
           <CardTitle className="text-sm font-medium leading-snug">{alert.message}</CardTitle>
         </div>

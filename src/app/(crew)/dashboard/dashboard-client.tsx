@@ -21,6 +21,7 @@ import { AlertsPanel } from "./alerts-panel";
 import { CabinAcoustics } from "./cabin-acoustics";
 import { CrewVitals } from "./crew-vitals";
 import { MessagesPanel } from "./messages-panel";
+import { Overview } from "./overview";
 import { RadiationPanel } from "./radiation-panel";
 import { VitalTrends } from "./vital-trends";
 
@@ -281,6 +282,12 @@ export function DashboardClient({
 
       <AlarmBanner alerts={alerts} crewById={crewById} me={me} pendingIds={pendingIds} onAction={perform} />
 
+      <Overview crew={snapshot.crew} vitals={snapshot.vitals} alerts={alerts} acoustics={snapshot.acoustics} me={me?.callsign ?? null} />
+
+      <CrewVitals crew={snapshot.crew} vitals={snapshot.vitals} />
+
+      <div className="grid items-start gap-6 lg:grid-cols-3">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
       <AlertsPanel
         alerts={alerts}
         crewById={crewById}
@@ -290,19 +297,14 @@ export function DashboardClient({
         onAction={perform}
       />
 
-      <MessagesPanel crewById={crewById} me={me} />
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <CrewVitals crew={snapshot.crew} vitals={snapshot.vitals} />
+          <VitalTrends crew={snapshot.crew} vitals={snapshot.vitals} me={me} />
         </div>
-        <div className="flex flex-col gap-6">
-          <CabinAcoustics windows={snapshot.acoustics} />
+        <div className="flex min-w-0 flex-col gap-6">
+          <MessagesPanel crewById={crewById} me={me} />
           <RadiationPanel crew={snapshot.crew} vitals={snapshot.vitals} demoMode={demoMode} />
+          <CabinAcoustics windows={snapshot.acoustics} />
         </div>
       </div>
-
-      <VitalTrends crew={snapshot.crew} vitals={snapshot.vitals} me={me} />
     </div>
   );
 }

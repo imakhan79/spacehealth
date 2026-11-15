@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { alarmLevel, alarmingAlerts, shouldSound, silenceNow, type AlarmLevel, type Silence } from "@/lib/dashboard/alarm";
 import { canPerform, type AlertAction } from "@/lib/dashboard/alert-mutations";
 import type { CrewMember, HealthAlert, Me } from "@/lib/dashboard/types";
-import { cn, timeAgo } from "@/lib/utils";
+import { Ago, useNow } from "@/lib/use-now";
+import { cn } from "@/lib/utils";
 
 const SILENCE_KEY = "omni:alarm-silence";
 const MAX_LISTED = 3;
@@ -125,22 +126,28 @@ export function AlarmBanner({ alerts, crewById, me, pendingIds, onAction }: Prop
   const alarming = useMemo(() => alarmingAlerts(alerts), [alerts]);
   const level = alarmLevel(alarming);
   const [silence, setSilence] = useState<Silence | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  const clock = useNow();
+  const [tick, setTick] = useState(0);
   const { play, blocked, unlock } = useBeeper();
 
   useEffect(() => setSilence(readSilence()), []);
+  // A 1 s tick so the silence countdown and expiry are exact.
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    const timer = window.setInterval(() => setTick((n) => n + 1), 1000);
     return () => window.clearInterval(timer);
   }, []);
+  // tick re-renders every second; null until hydrated.
+  const now = clock === null ? null : tick >= 0 ? Date.now() : clock;
 
-  const sounding = level !== null && shouldSound(alarming, silence, now);
+  // Before hydration nothing sounds; the banner itself still renders on the server.
+  const sounding = level !== null && now !== null && shouldSound(alarming, silence, now);
 
   // Beep on the level's cadence while sounding.
   useEffect(() => {
     if (!sounding || level === null) return;
     play(level);
-    if ("vibrate" in navigator) navigator.vibrate(level === "emergency" ? [200, 100, 200, 100, 200] : [300]);
+    // Browsers ignore vibration (and log an intervention) before the user has interacted.
+    if ("vibrate" in navigator && navigator.userActivation?.hasBeenActive) navigator.vibrate(level === "emergency" ? [200, 100, 200, 100, 200] : [300]);
     const timer = window.setInterval(() => play(level), PATTERN[level].everyMs);
     return () => window.clearInterval(timer);
   }, [sounding, level, play]);
@@ -157,8 +164,8 @@ export function AlarmBanner({ alerts, crewById, me, pendingIds, onAction }: Prop
 
   if (level === null) return null;
 
-  const silenced = !sounding;
-  const silenceLeftMin = silence ? Math.max(1, Math.ceil((silence.until - now) / 60_000)) : 0;
+  const silenced = now !== null && !sounding;
+  const silenceLeftMin = silence && now !== null ? Math.max(1, Math.ceil((silence.until - now) / 60_000)) : 0;
   const emergency = level === "emergency";
   const Icon = emergency ? AlertOctagon : AlertTriangle;
 
@@ -215,7 +222,7 @@ export function AlarmBanner({ alerts, crewById, me, pendingIds, onAction }: Prop
               </span>
               <span className="font-semibold">{who}</span>
               <span className="min-w-0 flex-1">{a.message}</span>
-              <span className="text-xs text-muted-foreground">{timeAgo(a.triggered_at, now)}</span>
+              <span className="text-xs text-muted-foreground"><Ago iso={a.triggered_at} /></span>
               <Button
                 size="sm"
                 disabled={!allowed.ok || pending}

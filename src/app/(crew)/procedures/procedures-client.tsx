@@ -9,7 +9,8 @@ import { useConnectivity } from "@/components/connectivity-provider";
 import type { Me } from "@/lib/dashboard/types";
 import { PROTOCOLS, missingCritical, protocolById, type Protocol } from "@/lib/procedures";
 import type { Tables } from "@/types/database.types";
-import { cn, timeAgo } from "@/lib/utils";
+import { Ago } from "@/lib/use-now";
+import { cn } from "@/lib/utils";
 
 type Run = Tables<"procedure_runs">;
 type Step = Tables<"procedure_steps">;
@@ -236,7 +237,7 @@ function ActiveRun({ run, steps, callsign, canAct, onChanged }: { run: Run; step
           <CircleAlert className="size-5" aria-hidden /> {protocol.title} · patient {callsign.get(run.patient_crew_id) ?? "crew"}
         </h2>
         <span className="text-xs text-muted-foreground">
-          started by {callsign.get(run.started_by) ?? "crew"} · {clock(run.started_at)} ({timeAgo(run.started_at)})
+          started by {callsign.get(run.started_by) ?? "crew"} · {clock(run.started_at)} (<Ago iso={run.started_at} />)
         </span>
       </div>
       <ol className="mt-3 flex flex-col gap-2">

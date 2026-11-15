@@ -9,7 +9,8 @@ import { doseRateTone } from "@/lib/dashboard/vital-thresholds";
 import { DOSE_EDGES, HATCHES, MODULES, NOISE_EDGES, binOf } from "@/lib/habitat";
 import { CO2_EDGES, assessAir, type AirReading } from "@/lib/air";
 import type { Tables } from "@/types/database.types";
-import { cn, timeAgo } from "@/lib/utils";
+import { Ago } from "@/lib/use-now";
+import { cn } from "@/lib/utils";
 
 type Layer = "noise" | "radiation" | "air";
 interface HabitatData {
@@ -30,7 +31,6 @@ export function HabitatClient({ me }: { me: Me | null }) {
   const [layer, setLayer] = useState<Layer>("noise");
   const [error, setError] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async (): Promise<void> => {
     if (client === null) return;
@@ -47,7 +47,6 @@ export function HabitatClient({ me }: { me: Me | null }) {
         .limit(200),
       client.from("cabin_air").select("module_id, co2_ppm, o2_pct, humidity_pct, temp_c, window_start").order("window_start", { ascending: false }).limit(80),
     ]);
-    setNow(Date.now());
     if ([crew, locations, acoustics, dose, air].some((r) => r.error)) {
       setError("Station server not responding; showing the last data loaded.");
       return;
@@ -248,7 +247,15 @@ export function HabitatClient({ me }: { me: Me | null }) {
               <tr key={r.m.id} className={cn("border-t border-border", hover === r.m.id && "bg-muted")}>
                 <td className="px-3 py-1.5 font-semibold">{r.m.name}</td>
                 <td className="px-3 py-1.5 tabular-nums">
-                  {r.noise ? `${r.noise.laeq.toFixed(1)} dBA${r.noise.limit ? " · over limit" : ""} · ${timeAgo(r.noise.at, now)}` : r.m.acoustic ? "no reading" : "no sensor"}
+                  {r.noise ? (
+                    <>
+                      {r.noise.laeq.toFixed(1)} dBA{r.noise.limit ? " · over limit" : ""} · <Ago iso={r.noise.at} />
+                    </>
+                  ) : r.m.acoustic ? (
+                    "no reading"
+                  ) : (
+                    "no sensor"
+                  )}
                 </td>
                 <td className="px-3 py-1.5 tabular-nums">
                   {r.air ? (

@@ -1,7 +1,8 @@
 "use client";
 
 import { AlertTriangle, HardDrive, SatelliteDish, ServerOff } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { useNow } from "@/lib/use-now";
 import { cn, timeAgo } from "@/lib/utils";
 import { useConnectivity } from "./connectivity-provider";
 
@@ -18,12 +19,9 @@ interface View {
  */
 export function NetworkStatus() {
   const { station, link, pendingChanges } = useConnectivity();
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 5_000);
-    return () => window.clearInterval(timer);
-  }, []);
+  // Shared clock: null until hydrated, so server and client render the same text.
+  const now = useNow();
+  const ago = (iso: string | null) => (now === null ? "…" : timeAgo(iso, now));
 
   const queued = link?.queuedForEarth ?? 0;
   let view: View;
@@ -41,7 +39,7 @@ export function NetworkStatus() {
   } else if (link?.status === "uplink_active") {
     view = {
       label: "Earth Uplink Active",
-      detail: `Last contact ${timeAgo(link.lastContactAt, now)}${link.rttMs !== null ? ` · RTT ${(link.rttMs / 1000).toFixed(1)}s` : ""}${queued > 0 ? ` · ${queued} sending` : ""}`,
+      detail: `Last contact ${ago(link.lastContactAt)}${link.rttMs !== null ? ` · RTT ${(link.rttMs / 1000).toFixed(1)}s` : ""}${queued > 0 ? ` · ${queued} sending` : ""}`,
       icon: <SatelliteDish aria-hidden />,
       tone: "border-ok/40 bg-ok/15 text-ok",
     };
@@ -58,7 +56,7 @@ export function NetworkStatus() {
       detail:
         link === null
           ? "Connecting to station server…"
-          : `No Earth link · all data saved aboard · ${queued} queued for Earth · last contact ${timeAgo(link.lastContactAt, now)}`,
+          : `No Earth link · all data saved aboard · ${queued} queued for Earth · last contact ${ago(link.lastContactAt)}`,
       icon: <HardDrive aria-hidden />,
       tone: "border-info/40 bg-info/15 text-info",
     };

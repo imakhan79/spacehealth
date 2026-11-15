@@ -8,7 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useConnectivity } from "@/components/connectivity-provider";
 import type { CrewMember, Me } from "@/lib/dashboard/types";
 import type { Tables } from "@/types/database.types";
-import { cn, timeAgo } from "@/lib/utils";
+import { Ago } from "@/lib/use-now";
+import { cn } from "@/lib/utils";
 
 type Message = Tables<"ground_messages"> & { ground_message_reads: Pick<Tables<"ground_message_reads">, "crew_member_id" | "read_at">[] };
 
@@ -20,7 +21,7 @@ export function MessagesPanel({ crewById, me }: { crewById: Map<string, CrewMemb
   const [error, setError] = useState<string | null>(null);
   const [marking, setMarking] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Set<string>>(new Set());
-  const [now, setNow] = useState(() => Date.now());
+  const [showAll, setShowAll] = useState(false);
 
   const load = useCallback(async (): Promise<void> => {
     if (client === null) return;
@@ -29,7 +30,6 @@ export function MessagesPanel({ crewById, me }: { crewById: Map<string, CrewMemb
       .select("id, author, priority, recipient_crew_id, subject, body, sent_at, received_at, ground_message_reads(crew_member_id, read_at)")
       .order("received_at", { ascending: false })
       .limit(30);
-    setNow(Date.now());
     if (res.error) {
       setError("Station server not responding; showing the last messages loaded.");
       return;
@@ -83,9 +83,9 @@ export function MessagesPanel({ crewById, me }: { crewById: Map<string, CrewMemb
         </Card>
       ) : (
         <ul className="flex flex-col gap-2">
-          {(messages ?? []).map((m) => {
+          {(showAll ? (messages ?? []) : (messages ?? []).slice(0, 4)).map((m) => {
             const read = mine(m);
-            const expanded = open.has(m.id) || !read;
+            const expanded = open.has(m.id);
             const to = m.recipient_crew_id ? (crewById.get(m.recipient_crew_id)?.callsign ?? "one crew member") : "all crew";
             const others = m.ground_message_reads.filter((r) => r.crew_member_id !== me?.crewMemberId);
             return (
@@ -109,14 +109,14 @@ export function MessagesPanel({ crewById, me }: { crewById: Map<string, CrewMemb
                       {m.priority === "urgent" && <Badge variant="warning">Urgent</Badge>}
                       <span className={cn("font-semibold", read && "font-normal text-muted-foreground")}>{m.subject}</span>
                       <span className="text-xs text-muted-foreground">
-                        {m.author} · to {to} · {timeAgo(m.sent_at, now)}
+                        {m.author} · to {to} · <Ago iso={m.sent_at} />
                       </span>
                     </button>
-                    {expanded && <p className="whitespace-pre-line text-sm">{m.body}</p>}
+                    {(expanded || !read) && <p className={cn("whitespace-pre-line text-sm", !expanded && "line-clamp-2 text-muted-foreground")}>{m.body}</p>}
                     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                       {read ? (
                         <span className="flex items-center gap-1">
-                          <Check className="size-3.5 text-ok" aria-hidden /> Read {timeAgo(read.read_at, now)}
+                          <Check className="size-3.5 text-ok" aria-hidden /> Read <Ago iso={read.read_at} />
                         </span>
                       ) : (
                         <Button size="sm" variant="outline" disabled={marking.has(m.id) || me?.crewMemberId == null} onClick={() => void markRead(m.id)}>
@@ -133,6 +133,11 @@ export function MessagesPanel({ crewById, me }: { crewById: Map<string, CrewMemb
             );
           })}
         </ul>
+      )}
+      {(messages?.length ?? 0) > 4 && (
+        <button onClick={() => setShowAll((v) => !v)} className="self-start text-sm text-info hover:underline">
+          {showAll ? "Show fewer" : `Show all ${messages!.length} messages`}
+        </button>
       )}
     </section>
   );

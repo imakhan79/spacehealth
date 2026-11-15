@@ -36,7 +36,12 @@ html {
 }
 
 body {
-  background: var(--color-background);
+  /* A faint glow behind the cabin UI; status colours stay the loudest thing. */
+  background:
+    radial-gradient(1100px 520px at 0% -8%, rgb(68 147 240 / 0.09), transparent 60%),
+    radial-gradient(900px 480px at 100% -4%, rgb(63 185 80 / 0.045), transparent 60%),
+    var(--color-background);
+  background-attachment: fixed;
   color: var(--color-foreground);
   font-family: var(--font-sans);
 }

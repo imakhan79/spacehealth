@@ -2,7 +2,8 @@ import { Radiation } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CrewMember, Vital } from "@/lib/dashboard/types";
 import { RADIATION, careerDoseTone, doseRateTone, latestRadiation, type Tone } from "@/lib/dashboard/vital-thresholds";
-import { cn, timeAgo } from "@/lib/utils";
+import { Ago } from "@/lib/use-now";
+import { cn } from "@/lib/utils";
 import { DrillButton, ShelterChecklist } from "./storm-drill";
 
 // Meter fill carries severity; the track is a lighter step of the same colour.
@@ -17,7 +18,6 @@ const TONE_WORD: Record<Tone, string> = { normal: "", caution: " · caution", em
 export function RadiationPanel({ crew, vitals, demoMode }: { crew: CrewMember[]; vitals: Vital[]; demoMode: boolean }) {
   const readings = latestRadiation(vitals);
   const shown = crew.filter((c) => readings.has(c.id));
-  const now = Date.now();
   const peakRate = Math.max(0, ...shown.map((c) => readings.get(c.id)?.doseRate ?? 0));
 
   return (
@@ -47,7 +47,7 @@ export function RadiationPanel({ crew, vitals, demoMode }: { crew: CrewMember[];
                 <div key={member.id} className="flex flex-col gap-1.5">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="font-semibold">{member.callsign}</span>
-                    <span className="text-xs text-muted-foreground">{timeAgo(r.at, now)}</span>
+                    <span className="text-xs text-muted-foreground"><Ago iso={r.at} /></span>
                   </div>
                   {r.cumulativeMsv !== null && pct !== null && (
                     <>

@@ -1,10 +1,12 @@
-import { Activity, ClipboardList, HeartHandshake, History, Map as MapIcon, Siren } from "lucide-react";
+import { Activity } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ConnectivityProvider } from "@/components/connectivity-provider";
 import { NetworkStatus } from "@/components/network-status";
 import { getMe } from "@/lib/dashboard/me";
 import { serverSupabaseEnv } from "@/lib/supabase/config";
+import { NowProvider } from "@/lib/use-now";
+import { NavLinks } from "./nav-links";
 import { SignOutButton } from "./sign-out-button";
 
 export const dynamic = "force-dynamic";
@@ -14,48 +16,40 @@ export default async function CrewLayout({ children }: { children: ReactNode }) 
   const me = await getMe();
 
   return (
+    <NowProvider>
     <ConnectivityProvider anonKey={anonKey}>
-      <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur print:hidden">
+      <header className="sticky top-0 z-10 border-b border-border/80 bg-background/85 backdrop-blur-md print:hidden">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <Activity className="size-5 text-info" aria-hidden />
-            <span className="font-semibold tracking-widest">OMNI</span>
+            <span className="flex size-8 items-center justify-center rounded-lg bg-info/15 ring-1 ring-info/30">
+              <Activity className="size-5 text-info" aria-hidden />
+            </span>
+            <span className="font-semibold tracking-[0.25em]">OMNI</span>
           </Link>
           <div className="order-last w-full sm:order-none sm:ml-4 sm:w-auto sm:max-w-xl sm:flex-1">
             <NetworkStatus />
           </div>
           <div className="ml-auto flex items-center gap-3 text-sm text-muted-foreground">
             {me?.callsign && (
-              <span>
-                <span className="font-semibold text-foreground">{me.callsign}</span>
-                {me.role && <span className="hidden sm:inline"> · {me.role.replace("_", " ")}</span>}
+              <span className="flex items-center gap-2">
+                <span className="flex size-7 items-center justify-center rounded-full bg-gradient-to-br from-series/40 to-muted text-[11px] font-bold text-foreground" aria-hidden>
+                  {me.callsign.slice(0, 3)}
+                </span>
+                <span>
+                  <span className="font-semibold text-foreground">{me.callsign}</span>
+                  {me.role && <span className="hidden sm:inline"> · {me.role.replace("_", " ")}</span>}
+                </span>
               </span>
             )}
-            <Link href="/care" className="flex items-center gap-1 hover:text-foreground">
-              <HeartHandshake className="size-4" aria-hidden />
-              <span className="hidden sm:inline">Care</span>
-            </Link>
-            <Link href="/habitat" className="flex items-center gap-1 hover:text-foreground">
-              <MapIcon className="size-4" aria-hidden />
-              <span className="hidden sm:inline">Habitat</span>
-            </Link>
-            <Link href="/procedures" className="flex items-center gap-1 hover:text-foreground">
-              <Siren className="size-4" aria-hidden />
-              <span className="hidden md:inline">Procedures</span>
-            </Link>
-            <Link href="/timeline" className="flex items-center gap-1 hover:text-foreground">
-              <History className="size-4" aria-hidden />
-              <span className="hidden md:inline">Timeline</span>
-            </Link>
-            <Link href="/handover" className="flex items-center gap-1 hover:text-foreground">
-              <ClipboardList className="size-4" aria-hidden />
-              <span className="hidden sm:inline">Handover</span>
-            </Link>
             <SignOutButton />
           </div>
+        </div>
+        <div className="mx-auto max-w-7xl px-4">
+          <NavLinks />
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
     </ConnectivityProvider>
+    </NowProvider>
   );
 }

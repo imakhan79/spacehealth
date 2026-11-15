@@ -17,9 +17,11 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const hasSessionCookie = request.cookies.getAll().some((c) => c.name.startsWith(AUTH_COOKIE_NAME));
   const isLogin = request.nextUrl.pathname.startsWith("/login");
+  // The home page is public (it only describes OMNI and links to sign-in).
+  const isPublic = isLogin || request.nextUrl.pathname === "/";
 
   if (!hasSessionCookie) {
-    if (isLogin) return response;
+    if (isPublic) return response;
     const login = request.nextUrl.clone();
     login.pathname = "/login";
     return NextResponse.redirect(login);
@@ -40,7 +42,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   try {
     const { data, error } = await supabase.auth.getUser();
     const definitelyInvalid = error !== null && typeof error.status === "number" && error.status >= 400 && error.status < 500;
-    if (definitelyInvalid && !isLogin) {
+    if (definitelyInvalid && !isPublic) {
       const login = request.nextUrl.clone();
       login.pathname = "/login";
       return NextResponse.redirect(login);

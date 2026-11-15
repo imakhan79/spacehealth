@@ -2,7 +2,7 @@ import { AudioLines } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AcousticWindow } from "@/lib/dashboard/types";
-import { timeAgo } from "@/lib/utils";
+import { Ago } from "@/lib/use-now";
 
 export function CabinAcoustics({ windows }: { windows: AcousticWindow[] }) {
   // Newest first; keep the latest window per module.
@@ -29,7 +29,7 @@ export function CabinAcoustics({ windows }: { windows: AcousticWindow[] }) {
                 <li key={w.module_id} className="flex items-center justify-between gap-3 py-2">
                   <div>
                     <div className="font-medium">{w.module_id}</div>
-                    <div className="text-xs text-muted-foreground">{timeAgo(w.window_start)}</div>
+                    <div className="text-xs text-muted-foreground"><Ago iso={w.window_start} /></div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-lg font-semibold tabular-nums">
