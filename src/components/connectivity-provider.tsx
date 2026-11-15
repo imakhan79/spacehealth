@@ -9,7 +9,8 @@ import type { Database } from "@/types/database.types";
 export type StationState = "unknown" | "reachable" | "unreachable";
 
 interface Connectivity {
-  client: SupabaseClient<Database>;
+  /** Null while server rendering; it is only used in effects and handlers. */
+  client: SupabaseClient<Database> | null;
   /** Can this tablet reach the spacecraft server (gateway + database)? */
   station: StationState;
   /** Spacecraft <-> Earth link as last reported by the relay. */
@@ -25,7 +26,8 @@ const ConnectivityContext = createContext<Connectivity | null>(null);
 const LINK_POLL_MS = 10_000;
 
 export function ConnectivityProvider({ anonKey, children }: { anonKey: string; children: ReactNode }) {
-  const client = useMemo(() => browserSupabase(anonKey), [anonKey]);
+  // browserSupabase reads window.location, so never build it while server rendering.
+  const client = useMemo(() => (typeof window === "undefined" ? null : browserSupabase(anonKey)), [anonKey]);
   const [station, setStation] = useState<StationState>("unknown");
   const [link, setLink] = useState<LinkSummary | null>(null);
   const [pendingChanges, setPendingChanges] = useState(0);
@@ -33,6 +35,7 @@ export function ConnectivityProvider({ anonKey, children }: { anonKey: string; c
   const reportStation = useCallback((reachable: boolean) => setStation(reachable ? "reachable" : "unreachable"), []);
 
   useEffect(() => {
+    if (client === null) return;
     let cancelled = false;
     const poll = async (): Promise<void> => {
       try {

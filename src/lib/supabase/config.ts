@@ -8,6 +8,22 @@ export interface ServerSupabaseEnv {
   anonKey: string;
 }
 
+export interface DemoLogin {
+  email: string;
+  password: string;
+}
+
+/**
+ * Shared demo account for a public ground demo, shown on the login page with
+ * a one-click button. Never set on flight hardware: real crew sign in with
+ * their own identities.
+ */
+export function demoLogin(): DemoLogin | null {
+  const email = process.env.OMNI_DEMO_EMAIL?.trim();
+  const password = process.env.OMNI_DEMO_PASSWORD;
+  return email && password ? { email, password } : null;
+}
+
 export function serverSupabaseEnv(): ServerSupabaseEnv {
   const url = process.env.OMNI_SUPABASE_INTERNAL_URL;
   const anonKey = process.env.OMNI_SUPABASE_ANON_KEY;

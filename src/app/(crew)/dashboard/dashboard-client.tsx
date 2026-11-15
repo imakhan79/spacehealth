@@ -120,6 +120,8 @@ export function DashboardClient({
   // --- Write path ---------------------------------------------------------------
   const write = useCallback(
     async (m: AlertMutation): Promise<WriteResult> => {
+      // status 0 = retryable: the change stays in the outbox.
+      if (client === null) return { kind: "error", status: 0, code: "", message: "Supabase client not ready" };
       const patch = m.action === "override" ? { status: targetStatus(m.action), override_reason: m.reason } : { status: targetStatus(m.action) };
       const res = await client
         .from("health_alerts")
@@ -208,6 +210,7 @@ export function DashboardClient({
 
   // --- Live refresh ---------------------------------------------------------------
   const refresh = useCallback(async (): Promise<void> => {
+    if (client === null) return;
     try {
       const next = await loadSnapshot(client);
       setSnapshot(next);

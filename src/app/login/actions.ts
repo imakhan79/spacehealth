@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { demoLogin } from "@/lib/supabase/config";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export interface LoginState {
@@ -11,7 +12,17 @@ export async function signIn(_prev: LoginState, form: FormData): Promise<LoginSt
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");
   if (!email || !password) return { error: "Enter your crew email and password." };
+  return attemptSignIn(email, password);
+}
 
+/** One-click sign-in for a ground demo. Unavailable unless the demo env is set. */
+export async function signInDemo(_prev: LoginState): Promise<LoginState> {
+  const demo = demoLogin();
+  if (demo === null) return { error: "Demo sign-in is not enabled." };
+  return attemptSignIn(demo.email, demo.password);
+}
+
+async function attemptSignIn(email: string, password: string): Promise<LoginState> {
   try {
     const supabase = await createServerSupabase();
     const { error } = await supabase.auth.signInWithPassword({ email, password });

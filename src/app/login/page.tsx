@@ -1,8 +1,13 @@
 import { Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { demoLogin } from "@/lib/supabase/config";
 import { LoginForm } from "./login-form";
 
+// Reads the demo env per request, so it must not be prerendered at build time.
+export const dynamic = "force-dynamic";
+
 export default function LoginPage() {
+  const demo = demoLogin();
   return (
     <main className="flex min-h-dvh items-center justify-center px-4">
       <Card className="w-full max-w-sm">
@@ -17,7 +22,7 @@ export default function LoginPage() {
           </p>
         </CardHeader>
         <CardContent>
-          <LoginForm />
+          <LoginForm demo={demo} />
         </CardContent>
       </Card>
     </main>
