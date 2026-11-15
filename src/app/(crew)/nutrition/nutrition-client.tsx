@@ -9,6 +9,7 @@ import { CATALOG, NUTRIENT_LABEL, TARGETS, behind, totals, type CatalogItem, typ
 import { useNow } from "@/lib/use-now";
 import type { Tables } from "@/types/database.types";
 import { cn } from "@/lib/utils";
+import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
 
 type Log = Tables<"intake_logs">;
 const KEYS = Object.keys(TARGETS) as (keyof Nutrients)[];
@@ -59,12 +60,18 @@ export function NutritionClient({ me }: { me: Me | null }) {
       client.from("intake_logs").select("*").gte("logged_at", midnight).order("logged_at", { ascending: false }),
     ]);
     if (c.error || l.error) {
-      setError("Station server not responding; showing the last data loaded.");
+      const cached = readPageCache<{ crew: typeof crew; logs: Log[] }>("nutrition");
+      if (cached) {
+        setCrew((x) => (x.length ? x : cached.data.crew));
+        setLogs((x) => x ?? cached.data.logs);
+      }
+      setError(outageNotice(cached?.at ?? null));
       return;
     }
     setError(null);
     setCrew(c.data ?? []);
     setLogs(l.data ?? []);
+    savePageCache("nutrition", { crew: c.data ?? [], logs: l.data ?? [] });
   }, [client]);
 
   useEffect(() => {

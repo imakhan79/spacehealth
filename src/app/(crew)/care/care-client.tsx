@@ -21,6 +21,7 @@ import { METRICS, toneOf, type Tone } from "@/lib/dashboard/vital-thresholds";
 import { BAND_TEXT, readiness, type ReadinessBand } from "@/lib/readiness";
 import type { Enums, Tables } from "@/types/database.types";
 import { cn } from "@/lib/utils";
+import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
 
 type Crew = Pick<Tables<"crew_members">, "id" | "callsign" | "full_name" | "role">;
 interface CareData {
@@ -71,11 +72,13 @@ export function CareClient({ me }: { me: Me | null }) {
     setNow(t);
     const failed = [crew, checkins, meds, doses, kit, rx, sessions, vitals, alerts].find((r) => r.error);
     if (failed) {
-      setError("Station server not responding; showing the last data loaded.");
+      const cached = readPageCache<CareData>("care");
+      setData((d) => d ?? cached?.data ?? null);
+      setError(outageNotice(cached?.at ?? null));
       return;
     }
     setError(null);
-    setData({
+    const fresh: CareData = {
       crew: crew.data ?? [],
       checkins: checkins.data ?? [],
       meds: meds.data ?? [],
@@ -85,7 +88,9 @@ export function CareClient({ me }: { me: Me | null }) {
       sessions: sessions.data ?? [],
       vitals: vitals.data ?? [],
       alerts: alerts.data ?? [],
-    });
+    };
+    setData(fresh);
+    savePageCache("care", fresh);
   }, [client]);
 
   useEffect(() => {
@@ -103,7 +108,7 @@ export function CareClient({ me }: { me: Me | null }) {
       </h1>
       {error && <p className="rounded-md border border-caution/40 bg-caution/10 px-3 py-2 text-sm text-caution">{error}</p>}
       {data === null ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        !error && <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
         <>
           <ReadinessSection data={data} now={now} />

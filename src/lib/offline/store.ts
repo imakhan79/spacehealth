@@ -4,6 +4,7 @@
 // the pending-mutation outbox. Every call degrades to "no cache" instead of
 // throwing (private mode, quota, blocked storage), so the UI never breaks
 // because local storage did.
+import { clearPageCaches } from "./page-cache";
 import type { AlertMutation } from "@/lib/dashboard/alert-mutations";
 import type { Snapshot } from "@/lib/dashboard/types";
 
@@ -90,6 +91,7 @@ export async function deleteMutation(id: string): Promise<void> {
 
 /** Sign-out on a shared tablet: leave no health data behind. */
 export async function clearAll(): Promise<void> {
+  clearPageCaches();
   await run(SNAPSHOTS, "readwrite", (s) => s.clear());
   await run(OUTBOX, "readwrite", (s) => s.clear());
   try {

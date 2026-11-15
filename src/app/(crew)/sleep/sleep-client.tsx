@@ -11,6 +11,7 @@ import { SLEEP_NEED_H, SLEEP_WINDOW, fatigueOutlook, summarizeSleep, type Fatigu
 import { useNow } from "@/lib/use-now";
 import type { Tables } from "@/types/database.types";
 import { cn } from "@/lib/utils";
+import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
 
 const H = 3_600_000;
 const D = 24 * H;
@@ -87,12 +88,18 @@ export function SleepClient({ me }: { me: Me | null }) {
       client.from("sleep_periods").select("*").gte("ended_at", new Date(Date.now() - 8 * D).toISOString()).order("started_at"),
     ]);
     if (c.error || p.error) {
-      setError("Station server not responding; showing the last data loaded.");
+      const cached = readPageCache<{ crew: typeof crew; periods: Tables<"sleep_periods">[] }>("sleep");
+      if (cached) {
+        setCrew((x) => (x.length ? x : cached.data.crew));
+        setPeriods((x) => x ?? cached.data.periods);
+      }
+      setError(outageNotice(cached?.at ?? null));
       return;
     }
     setError(null);
     setCrew(c.data ?? []);
     setPeriods(p.data ?? []);
+    savePageCache("sleep", { crew: c.data ?? [], periods: p.data ?? [] });
   }, [client]);
 
   useEffect(() => {
@@ -122,7 +129,7 @@ export function SleepClient({ me }: { me: Me | null }) {
       </p>
       {error && <p className="text-sm text-caution">{error}</p>}
       {periods === null || now === null ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        !error && <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
           {visible.map((c) => {

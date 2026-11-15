@@ -6,6 +6,7 @@ import { useConnectivity } from "@/components/connectivity-provider";
 import { protocolById } from "@/lib/procedures";
 import { buildTimeline, filterTimeline, type EventKind, type TimelineEvent } from "@/lib/timeline";
 import { cn } from "@/lib/utils";
+import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
 
 const KINDS: { kind: EventKind; label: string; icon: LucideIcon }[] = [
   { kind: "alert", label: "Alerts", icon: AlertTriangle },
@@ -52,13 +53,17 @@ export function TimelineClient() {
       client.from("procedure_runs").select("id, protocol, patient_crew_id, started_by, started_at, outcome, ended_at, ended_by").gte("started_at", since).limit(100),
     ]);
     if ([c, alerts, doses, meds, sessions, checkins, messages, runs].some((r) => r.error)) {
-      setError("Station server not responding; showing the last data loaded.");
+      const cached = readPageCache<{ crew: typeof crew; events: TimelineEvent[] }>("timeline");
+      if (cached) {
+        setCrew((x) => (x.length ? x : cached.data.crew));
+        setEvents((x) => x ?? cached.data.events);
+      }
+      setError(outageNotice(cached?.at ?? null));
       return;
     }
     setError(null);
     setCrew(c.data ?? []);
-    setEvents(
-      buildTimeline({
+    const built = buildTimeline({
         alerts: alerts.data ?? [],
         doses: doses.data ?? [],
         medNames: new Map((meds.data ?? []).map((m) => [m.id, m.name])),
@@ -67,8 +72,9 @@ export function TimelineClient() {
         messages: messages.data ?? [],
         runs: runs.data ?? [],
         protocolTitle: (id) => protocolById(id)?.title ?? id,
-      }),
-    );
+      });
+    setEvents(built);
+    savePageCache("timeline", { crew: c.data ?? [], events: built });
   }, [client]);
 
   useEffect(() => {
@@ -143,7 +149,7 @@ export function TimelineClient() {
 
       {error && <p className="text-sm text-caution">{error}</p>}
       {events === null ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        !error && <p className="text-sm text-muted-foreground">Loading…</p>
       ) : shown.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nothing matches these filters.</p>
       ) : (

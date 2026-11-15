@@ -10,6 +10,7 @@ import type { CrewMember, Me } from "@/lib/dashboard/types";
 import type { Tables } from "@/types/database.types";
 import { Ago } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
+import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
 
 type Message = Tables<"ground_messages"> & { ground_message_reads: Pick<Tables<"ground_message_reads">, "crew_member_id" | "read_at">[] };
 
@@ -31,11 +32,14 @@ export function MessagesPanel({ crewById, me }: { crewById: Map<string, CrewMemb
       .order("received_at", { ascending: false })
       .limit(30);
     if (res.error) {
-      setError("Station server not responding; showing the last messages loaded.");
+      const cached = readPageCache<Message[]>("messages");
+      setMessages((x) => x ?? cached?.data ?? null);
+      setError(outageNotice(cached?.at ?? null));
       return;
     }
     setError(null);
     setMessages(res.data as Message[]);
+    savePageCache("messages", res.data);
   }, [client]);
 
   useEffect(() => {

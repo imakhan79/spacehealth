@@ -11,6 +11,7 @@ import { PROTOCOLS, missingCritical, protocolById, type Protocol } from "@/lib/p
 import type { Tables } from "@/types/database.types";
 import { Ago } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
+import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
 
 type Run = Tables<"procedure_runs">;
 type Step = Tables<"procedure_steps">;
@@ -36,13 +37,20 @@ export function ProceduresClient({ me }: { me: Me | null }) {
     ]);
     setLoaded(true);
     if (c.error || r.error || st.error) {
-      setError("Station server not responding; showing the last data loaded.");
+      const cached = readPageCache<{ crew: Crew[]; runs: Run[]; steps: Step[] }>("procedures");
+      if (cached) {
+        setCrew((x) => (x.length ? x : cached.data.crew));
+        setRuns((x) => (x.length ? x : cached.data.runs));
+        setSteps((x) => (x.length ? x : cached.data.steps));
+      }
+      setError(outageNotice(cached?.at ?? null));
       return;
     }
     setError(null);
     setCrew(c.data ?? []);
     setRuns(r.data ?? []);
     setSteps(st.data ?? []);
+    savePageCache("procedures", { crew: c.data ?? [], runs: r.data ?? [], steps: st.data ?? [] });
   }, [client]);
 
   useEffect(() => {

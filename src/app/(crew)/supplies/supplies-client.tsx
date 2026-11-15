@@ -11,6 +11,7 @@ import { RESOURCES, RESUPPLY_IN_DAYS, supplyStatus, type Reading, type Resource,
 import { useNow } from "@/lib/use-now";
 import type { Tables } from "@/types/database.types";
 import { cn } from "@/lib/utils";
+import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
 
 const D = 86_400_000;
 const REFRESH_MS = 60_000;
@@ -74,11 +75,14 @@ export function SuppliesClient({ me }: { me: Me | null }) {
     if (client === null) return;
     const r = await client.from("consumable_readings").select("*").gte("measured_at", new Date(Date.now() - 31 * D).toISOString()).order("measured_at").limit(5000);
     if (r.error) {
-      setError("Station server not responding; showing the last data loaded.");
+      const cached = readPageCache<Tables<"consumable_readings">[]>("supplies");
+      setReadings((x) => x ?? cached?.data ?? null);
+      setError(outageNotice(cached?.at ?? null));
       return;
     }
     setError(null);
     setReadings(r.data ?? []);
+    savePageCache("supplies", r.data ?? []);
   }, [client]);
 
   useEffect(() => {
@@ -105,7 +109,7 @@ export function SuppliesClient({ me }: { me: Me | null }) {
       </p>
       {error && <p className="text-sm text-caution">{error}</p>}
       {readings === null || now === null ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        !error && <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {ORDER.map((res) => {

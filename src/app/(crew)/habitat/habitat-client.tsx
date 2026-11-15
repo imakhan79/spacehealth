@@ -11,6 +11,7 @@ import { CO2_EDGES, assessAir, type AirReading } from "@/lib/air";
 import type { Tables } from "@/types/database.types";
 import { Ago } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
+import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
 
 type Layer = "noise" | "radiation" | "air";
 interface HabitatData {
@@ -48,7 +49,10 @@ export function HabitatClient({ me }: { me: Me | null }) {
       client.from("cabin_air").select("module_id, co2_ppm, o2_pct, humidity_pct, temp_c, window_start").order("window_start", { ascending: false }).limit(80),
     ]);
     if ([crew, locations, acoustics, dose, air].some((r) => r.error)) {
-      setError("Station server not responding; showing the last data loaded.");
+      const cached = readPageCache<{ crew: HabitatData["crew"]; locations: HabitatData["locations"]; noise: [string, { laeq: number; limit: boolean; at: string }][]; dose: [string, { rate: number; at: string }][]; air: [string, AirReading & { at: string }][] }>("habitat");
+      if (cached)
+        setData((d) => d ?? { ...cached.data, noise: new Map(cached.data.noise), dose: new Map(cached.data.dose), air: new Map(cached.data.air) });
+      setError(outageNotice(cached?.at ?? null));
       return;
     }
     setError(null);
@@ -59,6 +63,7 @@ export function HabitatClient({ me }: { me: Me | null }) {
     const airBy = new Map<string, AirReading & { at: string }>();
     for (const a of air.data ?? []) if (!airBy.has(a.module_id)) airBy.set(a.module_id, { ...a, at: a.window_start });
     setData({ crew: crew.data ?? [], locations: locations.data ?? [], noise, dose: doseBy, air: airBy });
+    savePageCache("habitat", { crew: crew.data ?? [], locations: locations.data ?? [], noise: [...noise], dose: [...doseBy], air: [...airBy] });
   }, [client]);
 
   useEffect(() => {

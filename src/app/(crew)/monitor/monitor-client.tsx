@@ -168,7 +168,9 @@ export function MonitorClient() {
       client.from("health_alerts").select("crew_member_id, message").in("status", ["active", "acknowledged", "overridden"]).ilike("message", "%premature%"),
     ]);
     if (crew.error || hr.error || alerts.error) {
-      setError("Station server not responding; showing the last data loaded.");
+      // Never animate stale data as if it were a live trace.
+      setLeads(null);
+      setError("Station server not responding: no live ECG. Traces resume automatically when it is back.");
       return;
     }
     setError(null);
@@ -202,7 +204,7 @@ export function MonitorClient() {
       </p>
       {error && <p className="text-sm text-caution">{error}</p>}
       {leads === null ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        !error && <p className="text-sm text-muted-foreground">Loading…</p>
       ) : leads.length === 0 ? (
         <p className="text-sm text-muted-foreground">No crew with recent heart-rate telemetry.</p>
       ) : (

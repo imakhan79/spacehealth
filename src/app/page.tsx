@@ -114,7 +114,9 @@ export default async function Home() {
   const demo = demoLogin() !== null;
   const primary = signedIn
     ? { href: "/dashboard", label: "Open dashboard" }
-    : { href: "/login", label: demo ? "Try the live demo" : "Crew sign in" };
+    : demo
+      ? { href: "/dashboard", label: "Open the live dashboard" }
+      : { href: "/login", label: "Crew sign in" };
 
   return (
     <div className="min-h-dvh overflow-x-clip">
@@ -126,7 +128,7 @@ export default async function Home() {
           <span className="font-semibold tracking-[0.25em]">OMNI</span>
         </span>
         <Link href={primary.href} className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted">
-          {signedIn ? "Dashboard" : "Sign in"}
+          {signedIn || demo ? "Dashboard" : "Sign in"}
         </Link>
       </header>
 
@@ -152,7 +154,7 @@ export default async function Home() {
                 How it works
               </a>
             </div>
-            {demo && !signedIn && <p className="text-sm text-muted-foreground">One click, no account: the demo signs you in as the mission commander.</p>}
+            {demo && !signedIn && <p className="text-sm text-muted-foreground">No sign-in needed: you join a simulated crew as the mission commander.</p>}
           </div>
           <Preview />
         </section>

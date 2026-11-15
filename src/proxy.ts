@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database.types";
-import { AUTH_COOKIE_NAME } from "@/lib/supabase/config";
+import { AUTH_COOKIE_NAME, demoLogin } from "@/lib/supabase/config";
 
 // Refreshes the crew session and guards app routes.
 //
@@ -20,13 +20,6 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // The home page is public (it only describes OMNI and links to sign-in).
   const isPublic = isLogin || request.nextUrl.pathname === "/";
 
-  if (!hasSessionCookie) {
-    if (isPublic) return response;
-    const login = request.nextUrl.clone();
-    login.pathname = "/login";
-    return NextResponse.redirect(login);
-  }
-
   const supabase = createServerClient<Database>(url, anonKey, {
     cookieOptions: { name: AUTH_COOKIE_NAME, sameSite: "lax", secure: true, path: "/" },
     cookies: {
@@ -39,9 +32,37 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     },
   });
 
+  if (!hasSessionCookie) {
+    if (isPublic) return response;
+    // Ground demo only: open the app with no login form by signing the visitor
+    // in as the shared demo account. It is still a real session, so every
+    // query carries a token PostgREST verifies and RLS enforces. Never set on
+    // flight hardware, where crew sign in with their own identities.
+    const demo = demoLogin();
+    if (demo) {
+      try {
+        const { error } = await supabase.auth.signInWithPassword(demo);
+        // The new session cookies are on both the request and the response
+        // (setAll above), so this same request renders signed in.
+        if (!error) return response;
+      } catch {
+        // Fall through to the login page.
+      }
+    }
+    const login = request.nextUrl.clone();
+    login.pathname = "/login";
+    return NextResponse.redirect(login);
+  }
+
   try {
     const { data, error } = await supabase.auth.getUser();
     const definitelyInvalid = error !== null && typeof error.status === "number" && error.status >= 400 && error.status < 500;
+    // Demo: an expired demo session simply signs in again.
+    const demo = demoLogin();
+    if (definitelyInvalid && !isPublic && demo) {
+      const { error: again } = await supabase.auth.signInWithPassword(demo);
+      if (!again) return response;
+    }
     if (definitelyInvalid && !isPublic) {
       const login = request.nextUrl.clone();
       login.pathname = "/login";
