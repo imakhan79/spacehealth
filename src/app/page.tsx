@@ -127,7 +127,7 @@ export default async function Home() {
           </span>
           <span className="font-semibold tracking-[0.25em]">OMNI</span>
         </span>
-        <Link href={primary.href} className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted">
+        <Link prefetch={false} href={primary.href} className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted">
           {signedIn || demo ? "Dashboard" : "Sign in"}
         </Link>
       </header>
@@ -145,6 +145,7 @@ export default async function Home() {
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <Link
+                prefetch={false}
                 href={primary.href}
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground shadow-lg shadow-info/10 hover:bg-primary/90"
               >
@@ -217,7 +218,7 @@ export default async function Home() {
               <h2 className="text-2xl font-semibold tracking-tight">See it with live data</h2>
               <p className="mt-1 text-muted-foreground">A simulated crew of three: vitals every minute, a radiation drill on demand.</p>
             </div>
-            <Link href={primary.href} className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground hover:bg-primary/90">
+            <Link prefetch={false} href={primary.href} className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground hover:bg-primary/90">
               {primary.label} <ArrowRight className="size-4" aria-hidden />
             </Link>
           </div>
