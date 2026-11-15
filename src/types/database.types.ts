@@ -1,4 +1,4 @@
-// Mirrors supabase/migrations/*.sql (core schema, uplink relay, ground messages, crew care, air and procedures, sleep/nutrition/supplies).
+// Mirrors supabase/migrations/*.sql (core schema, uplink relay, ground messages, crew care, air and procedures, sleep/nutrition/supplies, EVA).
 // Once the local stack is up (Phase 2), regenerate with:
 //   supabase gen types typescript --db-url "$OMNI_DB_URL" --schema public > src/types/database.types.ts
 
@@ -180,6 +180,74 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      // supabase/migrations/20261115000700_eva.sql
+      eva_sessions: {
+        Row: {
+          id: string
+          ev1: string
+          ev2: string
+          objective: string
+          prebreathe_start: string
+          egress_at: string
+          planned_minutes: number
+          status: Database["public"]["Enums"]["eva_status"]
+          ended_at: string | null
+          ended_by: string | null
+          end_reason: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          ev1: string
+          ev2: string
+          objective: string
+          prebreathe_start: string
+          egress_at: string
+          planned_minutes: number
+          status?: Database["public"]["Enums"]["eva_status"]
+          ended_at?: string | null
+          ended_by?: string | null
+          end_reason?: string | null
+          created_at?: string
+        }
+        Update: {
+          status?: Database["public"]["Enums"]["eva_status"]
+          end_reason?: string | null
+        }
+        Relationships: []
+      }
+      suit_telemetry: {
+        Row: {
+          id: string
+          session_id: string
+          crew_member_id: string
+          recorded_at: string
+          suit_pressure_kpa: number
+          co2_mmhg: number
+          o2_pct: number
+          battery_pct: number
+          feedwater_pct: number
+          scrubber_pct: number
+          heart_rate: number
+          suit_temp_c: number
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          crew_member_id: string
+          recorded_at: string
+          suit_pressure_kpa: number
+          co2_mmhg: number
+          o2_pct: number
+          battery_pct: number
+          feedwater_pct: number
+          scrubber_pct: number
+          heart_rate: number
+          suit_temp_c: number
+        }
+        Update: Record<string, never>
+        Relationships: []
       }
       // supabase/migrations/20261115000600_sleep_nutrition_supplies.sql
       sleep_periods: {
@@ -657,6 +725,7 @@ export type Database = {
       }
     }
     Enums: {
+      eva_status: "planned" | "prebreathe" | "eva" | "complete" | "aborted"
       sleep_source: "wearable" | "manual"
       intake_kind: "meal" | "water"
       consumable: "water" | "oxygen" | "food" | "co2_cartridges"
@@ -701,6 +770,7 @@ export type Enums<T extends keyof PublicSchema["Enums"]> = PublicSchema["Enums"]
 export const Constants = {
   public: {
     Enums: {
+      eva_status: ["planned", "prebreathe", "eva", "complete", "aborted"],
       sleep_source: ["wearable", "manual"],
       intake_kind: ["meal", "water"],
       consumable: ["water", "oxygen", "food", "co2_cartridges"],
