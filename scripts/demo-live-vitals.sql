@@ -154,7 +154,10 @@ begin
     (v_cdr, 'heart_rate', 'caution', 'overridden', 'Heart rate 138 bpm',
       v_now - interval '70 minutes', null, null, v_cdr, v_now - interval '68 minutes', 'Scheduled resistance exercise session', null, true),
     (v_cmo, 'core_body_temp', 'advisory', 'resolved', 'Core temperature 37.9 °C after EVA prep',
-      v_now - interval '110 minutes', null, null, null, null, null, v_now - interval '90 minutes', true);
+      v_now - interval '110 minutes', null, null, null, null, null, v_now - interval '90 minutes', true),
+    -- Drives the simulated premature beats on the crew ECG monitor.
+    (v_ms1, 'heart_rate', 'caution', 'active', 'ECG: occasional premature beats (about 6 per minute)',
+      v_now - interval '12 minutes', null, null, null, null, null, null, true);
 end;
 $$;
 

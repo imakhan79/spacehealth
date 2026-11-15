@@ -1,14 +1,18 @@
 "use client";
 
-import { ClipboardList, HeartHandshake, History, LayoutDashboard, Map as MapIcon, Siren } from "lucide-react";
+import { Activity, ClipboardList, Container, HeartHandshake, History, LayoutDashboard, Map as MapIcon, Moon, Siren, Utensils } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/monitor", label: "ECG", icon: Activity },
   { href: "/care", label: "Care", icon: HeartHandshake },
+  { href: "/sleep", label: "Sleep", icon: Moon },
+  { href: "/nutrition", label: "Nutrition", icon: Utensils },
   { href: "/habitat", label: "Habitat", icon: MapIcon },
+  { href: "/supplies", label: "Supplies", icon: Container },
   { href: "/procedures", label: "Procedures", icon: Siren },
   { href: "/timeline", label: "Timeline", icon: History },
   { href: "/handover", label: "Handover", icon: ClipboardList },

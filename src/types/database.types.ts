@@ -1,4 +1,4 @@
-// Mirrors supabase/migrations/*.sql (core schema, uplink relay, ground messages, crew care, air and procedures).
+// Mirrors supabase/migrations/*.sql (core schema, uplink relay, ground messages, crew care, air and procedures, sleep/nutrition/supplies).
 // Once the local stack is up (Phase 2), regenerate with:
 //   supabase gen types typescript --db-url "$OMNI_DB_URL" --schema public > src/types/database.types.ts
 
@@ -180,6 +180,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      // supabase/migrations/20261115000600_sleep_nutrition_supplies.sql
+      sleep_periods: {
+        Row: {
+          id: string
+          crew_member_id: string
+          started_at: string
+          ended_at: string
+          quality: number | null
+          source: Database["public"]["Enums"]["sleep_source"]
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          crew_member_id?: string
+          started_at: string
+          ended_at: string
+          quality?: number | null
+          source?: Database["public"]["Enums"]["sleep_source"]
+          created_at?: string
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
+      intake_logs: {
+        Row: {
+          id: string
+          crew_member_id: string
+          logged_at: string
+          kind: Database["public"]["Enums"]["intake_kind"]
+          label: string
+          kcal: number
+          protein_g: number
+          calcium_mg: number
+          vitamin_d_iu: number
+          water_ml: number
+        }
+        Insert: {
+          id?: string
+          crew_member_id?: string
+          logged_at?: string
+          kind: Database["public"]["Enums"]["intake_kind"]
+          label: string
+          kcal?: number
+          protein_g?: number
+          calcium_mg?: number
+          vitamin_d_iu?: number
+          water_ml?: number
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
+      consumable_readings: {
+        Row: {
+          id: string
+          resource: Database["public"]["Enums"]["consumable"]
+          quantity: number
+          measured_at: string
+          recorded_by: string | null
+        }
+        Insert: {
+          id?: string
+          resource: Database["public"]["Enums"]["consumable"]
+          quantity: number
+          measured_at?: string
+          recorded_by?: string | null
+        }
+        Update: Record<string, never>
+        Relationships: []
       }
       // supabase/migrations/20261115000500_air_and_procedures.sql
       cabin_air: {
@@ -588,6 +657,9 @@ export type Database = {
       }
     }
     Enums: {
+      sleep_source: "wearable" | "manual"
+      intake_kind: "meal" | "water"
+      consumable: "water" | "oxygen" | "food" | "co2_cartridges"
       procedure_outcome: "in_progress" | "completed" | "aborted"
       exercise_kind: "treadmill" | "resistance" | "cycle"
       message_priority: "routine" | "urgent"
@@ -629,6 +701,9 @@ export type Enums<T extends keyof PublicSchema["Enums"]> = PublicSchema["Enums"]
 export const Constants = {
   public: {
     Enums: {
+      sleep_source: ["wearable", "manual"],
+      intake_kind: ["meal", "water"],
+      consumable: ["water", "oxygen", "food", "co2_cartridges"],
       procedure_outcome: ["in_progress", "completed", "aborted"],
       exercise_kind: ["treadmill", "resistance", "cycle"],
       message_priority: ["routine", "urgent"],
