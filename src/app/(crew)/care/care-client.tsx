@@ -22,6 +22,7 @@ import { BAND_TEXT, readiness, type ReadinessBand } from "@/lib/readiness";
 import type { Enums, Tables } from "@/types/database.types";
 import { cn } from "@/lib/utils";
 import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
+import { HowTo } from "@/components/how-to";
 
 type Crew = Pick<Tables<"crew_members">, "id" | "callsign" | "full_name" | "role">;
 interface CareData {
@@ -106,6 +107,7 @@ export function CareClient({ me }: { me: Me | null }) {
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
         <HeartHandshake className="size-6 text-info" aria-hidden /> Crew care
       </h1>
+      <HowTo page="care" />
       {error && <p className="rounded-md border border-caution/40 bg-caution/10 px-3 py-2 text-sm text-caution">{error}</p>}
       {data === null ? (
         !error && <p className="text-sm text-muted-foreground">Loading…</p>

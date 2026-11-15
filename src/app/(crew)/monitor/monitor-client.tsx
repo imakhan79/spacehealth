@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useConnectivity } from "@/components/connectivity-provider";
 import { analyzeRhythm, beatsBetween, ecgValue } from "@/lib/ecg";
 import { cn } from "@/lib/utils";
+import { HowTo } from "@/components/how-to";
 
 interface Lead {
   id: string;
@@ -197,6 +198,7 @@ export function MonitorClient() {
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
         <Activity className="size-6 text-ok" aria-hidden /> ECG monitor
       </h1>
+      <HowTo page="monitor" />
       <p className="text-sm text-muted-foreground">
         Live traces for each crew member. This demo has no ECG electrodes: traces are synthesized from heart-rate telemetry, and the rhythm analysis reads the
         beats the same way a monitor reads R peaks.

@@ -7,6 +7,7 @@ import { protocolById } from "@/lib/procedures";
 import { buildTimeline, filterTimeline, type EventKind, type TimelineEvent } from "@/lib/timeline";
 import { cn } from "@/lib/utils";
 import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
+import { HowTo } from "@/components/how-to";
 
 const KINDS: { kind: EventKind; label: string; icon: LucideIcon }[] = [
   { kind: "alert", label: "Alerts", icon: AlertTriangle },
@@ -103,6 +104,7 @@ export function TimelineClient() {
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
         <History className="size-6 text-info" aria-hidden /> Mission timeline
       </h1>
+      <HowTo page="timeline" />
       <p className="text-sm text-muted-foreground">Everything recorded aboard in the last {HOURS} hours, newest first. Times are UTC.</p>
 
       {/* One row of filters, scoping the whole list. */}

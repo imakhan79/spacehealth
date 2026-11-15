@@ -8,6 +8,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import type { Tables } from "@/types/database.types";
 import { cn } from "@/lib/utils";
 import { PrintButton } from "./print-button";
+import { HowTo } from "@/components/how-to";
 
 export const dynamic = "force-dynamic";
 
@@ -135,6 +136,8 @@ export default async function HandoverPage({ searchParams }: { searchParams: Pro
           <PrintButton />
         </div>
       </div>
+
+      <HowTo page="handover" />
 
       <p className="text-sm text-muted-foreground print:text-black">
         {hours} h ending {fmtTime(now)} on {new Date(now).toISOString().slice(0, 10)} · prepared for {me?.callsign ?? "crew"} · all times UTC

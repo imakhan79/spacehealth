@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, ClipboardList, Container, HeartHandshake, History, LayoutDashboard, Map as MapIcon, Moon, Orbit, Siren, Utensils } from "lucide-react";
+import { Activity, CircleHelp, ClipboardList, Container, HeartHandshake, History, LayoutDashboard, Map as MapIcon, Moon, Orbit, Siren, Utensils } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,7 @@ const LINKS = [
   { href: "/procedures", label: "Procedures", icon: Siren },
   { href: "/timeline", label: "Timeline", icon: History },
   { href: "/handover", label: "Handover", icon: ClipboardList },
+  { href: "/help", label: "Help", icon: CircleHelp },
 ] as const;
 
 /** Section tabs; the current page is marked for screen readers and visually. */

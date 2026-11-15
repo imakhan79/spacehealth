@@ -10,6 +10,7 @@ import { useNow } from "@/lib/use-now";
 import type { Tables } from "@/types/database.types";
 import { cn } from "@/lib/utils";
 import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
+import { HowTo } from "@/components/how-to";
 
 type Log = Tables<"intake_logs">;
 const KEYS = Object.keys(TARGETS) as (keyof Nutrients)[];
@@ -101,6 +102,7 @@ export function NutritionClient({ me }: { me: Me | null }) {
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
         <Utensils className="size-6 text-info" aria-hidden /> Nutrition & hydration
       </h1>
+      <HowTo page="nutrition" />
       <p className="text-sm text-muted-foreground">
         Daily targets (UTC day). Calcium, vitamin D and protein help protect bone and muscle in microgravity; thirst is blunted in space, so water is easy
         to miss.

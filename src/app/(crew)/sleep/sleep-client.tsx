@@ -12,6 +12,7 @@ import { useNow } from "@/lib/use-now";
 import type { Tables } from "@/types/database.types";
 import { cn } from "@/lib/utils";
 import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
+import { HowTo } from "@/components/how-to";
 
 const H = 3_600_000;
 const D = 24 * H;
@@ -123,6 +124,7 @@ export function SleepClient({ me }: { me: Me | null }) {
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
         <Moon className="size-6 text-info" aria-hidden /> Sleep & circadian
       </h1>
+      <HowTo page="sleep" />
       <p className="text-sm text-muted-foreground">
         Target {SLEEP_NEED_H} h a night inside the lights-off window. Fatigue outlook is for the next 08:00 UTC shift: a simple model that lists its reasons,
         not a validated fatigue score.

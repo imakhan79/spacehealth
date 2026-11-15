@@ -12,6 +12,7 @@ import { useNow } from "@/lib/use-now";
 import type { Tables } from "@/types/database.types";
 import { cn } from "@/lib/utils";
 import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
+import { HowTo } from "@/components/how-to";
 
 const D = 86_400_000;
 const REFRESH_MS = 60_000;
@@ -103,6 +104,7 @@ export function SuppliesClient({ me }: { me: Me | null }) {
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
         <Container className="size-6 text-info" aria-hidden /> Life-support supplies
       </h1>
+      <HowTo page="supplies" />
       <p className="text-sm text-muted-foreground">
         Usage is fitted over the last 7 days; days left assume that rate continues. Next resupply arrives in {RESUPPLY_IN_DAYS} days; stock should outlast it
         by at least two weeks.

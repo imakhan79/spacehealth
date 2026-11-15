@@ -11,6 +11,7 @@ import { CONSUMABLE_LABEL, PREBREATHE_MINUTES, SUIT, assessSuit, minutesLeft, ty
 import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
 import type { Tables } from "@/types/database.types";
 import { cn } from "@/lib/utils";
+import { HowTo } from "@/components/how-to";
 
 type Session = Tables<"eva_sessions">;
 type Row = Tables<"suit_telemetry">;
@@ -221,6 +222,7 @@ export function EvaClient({ me }: { me: Me | null }) {
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
         <Orbit className="size-6 text-info" aria-hidden /> EVA monitor
       </h1>
+      <HowTo page="eva" />
       <p className="text-sm text-muted-foreground">
         Spacewalk suit telemetry for the intravehicular operator. Limits are demo-grade, modelled on the US EMU suit (about {SUIT.pressureNominalKpa} kPa); a real
         mission uses its own flight rules.

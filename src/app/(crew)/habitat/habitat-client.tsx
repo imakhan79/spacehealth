@@ -12,6 +12,7 @@ import type { Tables } from "@/types/database.types";
 import { Ago } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
+import { HowTo } from "@/components/how-to";
 
 type Layer = "noise" | "radiation" | "air";
 interface HabitatData {
@@ -117,6 +118,7 @@ export function HabitatClient({ me }: { me: Me | null }) {
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
         <MapIcon className="size-6 text-info" aria-hidden /> Habitat
       </h1>
+      <HowTo page="habitat" />
 
       <div className="flex flex-wrap items-center gap-3">
         <div role="radiogroup" aria-label="Map layer" className="flex rounded-md border border-border p-0.5">

@@ -12,6 +12,7 @@ import type { Tables } from "@/types/database.types";
 import { Ago } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
 import { outageNotice, readPageCache, savePageCache } from "@/lib/offline/page-cache";
+import { HowTo } from "@/components/how-to";
 
 type Run = Tables<"procedure_runs">;
 type Step = Tables<"procedure_steps">;
@@ -75,6 +76,7 @@ export function ProceduresClient({ me }: { me: Me | null }) {
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
         <Siren className="size-6 text-emergency" aria-hidden /> Emergency procedures
       </h1>
+      <HowTo page="procedures" />
       <p className="text-sm text-muted-foreground">
         Guided protocols with every step recorded: who did it and when. Training-grade outlines for this demo; a real mission uses its flight surgeons&apos;
         approved procedures.

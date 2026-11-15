@@ -24,6 +24,7 @@ import { MessagesPanel } from "./messages-panel";
 import { Overview } from "./overview";
 import { RadiationPanel } from "./radiation-panel";
 import { VitalTrends } from "./vital-trends";
+import { HowTo } from "@/components/how-to";
 
 const POLL_MS = 5_000;
 const ME_KEY = "omni:me";
@@ -283,6 +284,8 @@ export function DashboardClient({
       <AlarmBanner alerts={alerts} crewById={crewById} me={me} pendingIds={pendingIds} onAction={perform} />
 
       <Overview crew={snapshot.crew} vitals={snapshot.vitals} alerts={alerts} acoustics={snapshot.acoustics} me={me?.callsign ?? null} />
+
+      <HowTo page="dashboard" />
 
       <CrewVitals crew={snapshot.crew} vitals={snapshot.vitals} />
 
