@@ -40,3 +40,14 @@ body {
   color: var(--color-foreground);
   font-family: var(--font-sans);
 }
+
+/* Reports print black on white, whatever the cabin theme. */
+@media print {
+  html {
+    color-scheme: light;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
+}

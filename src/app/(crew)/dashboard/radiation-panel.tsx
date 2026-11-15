@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CrewMember, Vital } from "@/lib/dashboard/types";
 import { RADIATION, careerDoseTone, doseRateTone, latestRadiation, type Tone } from "@/lib/dashboard/vital-thresholds";
 import { cn, timeAgo } from "@/lib/utils";
+import { DrillButton, ShelterChecklist } from "./storm-drill";
 
 // Meter fill carries severity; the track is a lighter step of the same colour.
 const METER: Record<Tone, { fill: string; track: string; text: string }> = {
@@ -13,10 +14,11 @@ const METER: Record<Tone, { fill: string; track: string; text: string }> = {
 
 const TONE_WORD: Record<Tone, string> = { normal: "", caution: " · caution", emergency: " · emergency" };
 
-export function RadiationPanel({ crew, vitals }: { crew: CrewMember[]; vitals: Vital[] }) {
+export function RadiationPanel({ crew, vitals, demoMode }: { crew: CrewMember[]; vitals: Vital[]; demoMode: boolean }) {
   const readings = latestRadiation(vitals);
   const shown = crew.filter((c) => readings.has(c.id));
   const now = Date.now();
+  const peakRate = Math.max(0, ...shown.map((c) => readings.get(c.id)?.doseRate ?? 0));
 
   return (
     <section aria-labelledby="radiation-heading" className="flex flex-col gap-3">
@@ -31,6 +33,7 @@ export function RadiationPanel({ crew, vitals }: { crew: CrewMember[]; vitals: V
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
+          {doseRateTone(peakRate) === "emergency" && <ShelterChecklist peak={peakRate} />}
           {shown.length === 0 ? (
             <p className="text-sm text-muted-foreground">No dosimeter readings yet.</p>
           ) : (
@@ -85,6 +88,7 @@ export function RadiationPanel({ crew, vitals }: { crew: CrewMember[]; vitals: V
               );
             })
           )}
+          {demoMode && <DrillButton />}
         </CardContent>
       </Card>
     </section>

@@ -20,6 +20,7 @@ import { AlarmBanner } from "./alarm-banner";
 import { AlertsPanel } from "./alerts-panel";
 import { CabinAcoustics } from "./cabin-acoustics";
 import { CrewVitals } from "./crew-vitals";
+import { MessagesPanel } from "./messages-panel";
 import { RadiationPanel } from "./radiation-panel";
 import { VitalTrends } from "./vital-trends";
 
@@ -55,10 +56,13 @@ export function DashboardClient({
   initial,
   serverError,
   me: serverMe,
+  demoMode,
 }: {
   initial: Snapshot | null;
   serverError: string | null;
   me: Me | null;
+  /** Ground demo: shows demo-only controls such as the storm drill. */
+  demoMode: boolean;
 }) {
   const { client, station, reportStation, setPendingChanges } = useConnectivity();
   const [me, setMe] = useState<Me | null>(serverMe);
@@ -286,13 +290,15 @@ export function DashboardClient({
         onAction={perform}
       />
 
+      <MessagesPanel crewById={crewById} me={me} />
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <CrewVitals crew={snapshot.crew} vitals={snapshot.vitals} />
         </div>
         <div className="flex flex-col gap-6">
           <CabinAcoustics windows={snapshot.acoustics} />
-          <RadiationPanel crew={snapshot.crew} vitals={snapshot.vitals} />
+          <RadiationPanel crew={snapshot.crew} vitals={snapshot.vitals} demoMode={demoMode} />
         </div>
       </div>
 

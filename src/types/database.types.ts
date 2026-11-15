@@ -1,4 +1,4 @@
-// Mirrors supabase/migrations/20261115000000_omni_core_schema.sql.
+// Mirrors supabase/migrations/*.sql (core schema, uplink relay, ground messages).
 // Once the local stack is up (Phase 2), regenerate with:
 //   supabase gen types typescript --db-url "$OMNI_DB_URL" --schema public > src/types/database.types.ts
 
@@ -181,6 +181,70 @@ export type Database = {
           },
         ]
       }
+      // supabase/migrations/20261115000300_ground_messages.sql
+      ground_messages: {
+        Row: {
+          id: string
+          author: string
+          priority: Database["public"]["Enums"]["message_priority"]
+          recipient_crew_id: string | null
+          subject: string
+          body: string
+          sent_at: string
+          received_at: string
+        }
+        // Written aboard only by the relay.
+        Insert: {
+          id?: string
+          author: string
+          priority?: Database["public"]["Enums"]["message_priority"]
+          recipient_crew_id?: string | null
+          subject: string
+          body: string
+          sent_at: string
+          received_at?: string
+        }
+        Update: Record<string, never>
+        Relationships: [
+          {
+            foreignKeyName: "ground_messages_recipient_crew_id_fkey"
+            columns: ["recipient_crew_id"]
+            isOneToOne: false
+            referencedRelation: "crew_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ground_message_reads: {
+        Row: {
+          message_id: string
+          crew_member_id: string
+          read_at: string
+        }
+        // crew_member_id and read_at are stamped server-side.
+        Insert: {
+          message_id: string
+          crew_member_id?: string
+          read_at?: string
+        }
+        Update: Record<string, never>
+        Relationships: [
+          {
+            foreignKeyName: "ground_message_reads_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "ground_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ground_message_reads_crew_member_id_fkey"
+            columns: ["crew_member_id"]
+            isOneToOne: false
+            referencedRelation: "crew_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ambient_acoustics: {
         Row: {
           id: string
@@ -261,6 +325,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      // Ground demo database only (scripts/demo-live-vitals.sql), never aboard.
+      demo_solar_drill: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_link_status: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -283,6 +352,7 @@ export type Database = {
       }
     }
     Enums: {
+      message_priority: "routine" | "urgent"
       sync_status: "local_only" | "queued_for_earth" | "in_flight" | "synced" | "conflict"
       crew_role: "crew" | "flight_surgeon" | "commander" | "sensor_gateway"
       node_origin: "spacecraft" | "earth"
@@ -321,6 +391,7 @@ export type Enums<T extends keyof PublicSchema["Enums"]> = PublicSchema["Enums"]
 export const Constants = {
   public: {
     Enums: {
+      message_priority: ["routine", "urgent"],
       sync_status: ["local_only", "queued_for_earth", "in_flight", "synced", "conflict"],
       crew_role: ["crew", "flight_surgeon", "commander", "sensor_gateway"],
       node_origin: ["spacecraft", "earth"],

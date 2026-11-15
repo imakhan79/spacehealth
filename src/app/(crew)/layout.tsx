@@ -1,4 +1,5 @@
-import { Activity } from "lucide-react";
+import { Activity, ClipboardList } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { ConnectivityProvider } from "@/components/connectivity-provider";
 import { NetworkStatus } from "@/components/network-status";
@@ -14,12 +15,12 @@ export default async function CrewLayout({ children }: { children: ReactNode }) 
 
   return (
     <ConnectivityProvider anonKey={anonKey}>
-      <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur print:hidden">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
-          <div className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center gap-2">
             <Activity className="size-5 text-info" aria-hidden />
             <span className="font-semibold tracking-widest">OMNI</span>
-          </div>
+          </Link>
           <div className="order-last w-full sm:order-none sm:ml-4 sm:w-auto sm:max-w-xl sm:flex-1">
             <NetworkStatus />
           </div>
@@ -30,6 +31,10 @@ export default async function CrewLayout({ children }: { children: ReactNode }) 
                 {me.role && <span className="hidden sm:inline"> · {me.role.replace("_", " ")}</span>}
               </span>
             )}
+            <Link href="/handover" className="flex items-center gap-1 hover:text-foreground">
+              <ClipboardList className="size-4" aria-hidden />
+              <span className="hidden sm:inline">Handover</span>
+            </Link>
             <SignOutButton />
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { getMe } from "@/lib/dashboard/me";
 import { loadSnapshot } from "@/lib/dashboard/queries";
 import type { Snapshot } from "@/lib/dashboard/types";
+import { demoLogin } from "@/lib/supabase/config";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { DashboardClient } from "./dashboard-client";
 
@@ -20,5 +21,5 @@ export default async function DashboardPage() {
     serverError = error instanceof Error ? error.message : String(error);
   }
 
-  return <DashboardClient initial={initial} serverError={serverError} me={me} />;
+  return <DashboardClient initial={initial} serverError={serverError} me={me} demoMode={demoLogin() !== null} />;
 }

@@ -1,10 +1,42 @@
-import { HeartPulse } from "lucide-react";
+import { HeartPulse, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CrewMember, Vital } from "@/lib/dashboard/types";
+import { forecast, type Forecast } from "@/lib/dashboard/forecast";
 import { METRICS, toneOf, type Tone } from "@/lib/dashboard/vital-thresholds";
 import { cn, timeAgo } from "@/lib/utils";
 
 const STALE_MS = 5 * 60_000;
+
+/** Early warnings for one member: normal vitals trending into caution soon. */
+function forecastsFor(samples: Vital[], now: number): Forecast[] {
+  const out: Forecast[] = [];
+  for (const m of METRICS) {
+    const series = samples.filter((s) => s.metric === m.key).map((s) => ({ t: Date.parse(s.recorded_at), v: s.value }));
+    const f = forecast(m, series, now);
+    if (f) out.push(f);
+  }
+  return out.sort((a, b) => a.minutesToCross - b.minutesToCross);
+}
+
+export function EarlyWarnings({ items }: { items: Forecast[] }) {
+  if (items.length === 0) return null;
+  return (
+    <ul className="flex flex-col gap-1" aria-label="Early warnings">
+      {items.map((f) => {
+        const spec = METRICS.find((m) => m.key === f.metric)!;
+        const Icon = f.direction === "rising" ? TrendingUp : TrendingDown;
+        return (
+          <li key={f.metric} className="flex items-start gap-1.5 rounded-md border border-caution/40 bg-caution/10 px-2 py-1 text-xs text-caution">
+            <Icon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+            <span>
+              {spec.label} {f.direction}, reaches caution ({f.threshold} {spec.unit}) in about {Math.max(1, Math.round(f.minutesToCross))} min
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 const TONE_CLASS: Record<Tone, string> = {
   normal: "text-foreground",
@@ -82,6 +114,7 @@ export function CrewVitals({ crew, vitals }: { crew: CrewMember[]; vitals: Vital
                     })}
                   </dl>
                   <Sparkline values={hr} />
+                  <EarlyWarnings items={stale ? [] : forecastsFor(samples, now)} />
                 </CardContent>
               </Card>
             );
